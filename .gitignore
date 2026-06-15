@@ -1,0 +1,12 @@
+/target
+/dist_portable
+/animesphere_portable.zip
+/config.json
+/database.json
+/episodes.json
+/frontend/node_modules
+/frontend/dist
+.DS_Store
+
+# Exclude large binaries that exceed GitHub's 100MB file limit
+/bin/mpv-sdk/libmpv-2.dll
