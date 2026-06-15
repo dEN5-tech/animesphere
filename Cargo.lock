@@ -20,6 +20,7 @@ dependencies = [
  "html-escape",
  "libmpv2",
  "prost",
+ "raw-window-handle",
  "reqwest",
  "scraper",
  "serde",

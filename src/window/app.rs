@@ -1,4 +1,6 @@
 use std::sync::Arc;
+#[cfg(target_os = "linux")]
+use raw_window_handle::{HasWindowHandle, RawWindowHandle};
 use tao::event_loop::{EventLoopBuilder, ControlFlow};
 use tao::window::{WindowBuilder, Icon};
 use wry::WebViewBuilder;
@@ -44,8 +46,11 @@ impl DesktopApp {
 
         #[cfg(target_os = "linux")]
         let wid = {
-            use tao::platform::unix::WindowExtUnix;
-            window.x11_window().unwrap_or(0) as i64
+            match window.window_handle().map(|handle| handle.as_raw()) {
+                Ok(RawWindowHandle::Xlib(handle)) => handle.window as i64,
+                // mpv embedding expects an X11/XID window id. Wayland has no compatible wid.
+                _ => 0,
+            }
         };
 
         #[cfg(target_os = "macos")]
