@@ -129,7 +129,11 @@ impl DesktopApp {
                 tao::event::Event::WindowEvent {
                     event: tao::event::WindowEvent::CloseRequested,
                     ..
-                } => *control_flow = ControlFlow::Exit,
+                } => {
+                    let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*self.container);
+                    discord.clear();
+                    *control_flow = ControlFlow::Exit;
+                }
                 _ => {}
             }
         });

@@ -4,9 +4,12 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(default)]
 pub struct AppConfig {
     pub proxy_url: String,
     pub search_provider: String,
+    pub discord_presence_enabled: bool,
+    pub discord_client_id: String,
 }
 
 impl Default for AppConfig {
@@ -14,6 +17,8 @@ impl Default for AppConfig {
         Self {
             proxy_url: "http://127.0.0.1:2080".to_string(),
             search_provider: "animevost".to_string(),
+            discord_presence_enabled: false,
+            discord_client_id: String::new(),
         }
     }
 }
@@ -132,4 +137,3 @@ pub fn save_history(history: &Vec<HistoryTitle>) -> Result<(), String> {
     file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
-

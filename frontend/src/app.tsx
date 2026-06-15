@@ -216,6 +216,8 @@ export function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [proxyUrl, setProxyUrl] = useState("http://127.0.0.1:2080");
   const [searchProvider, setSearchProvider] = useState("animevost");
+  const [discordPresenceEnabled, setDiscordPresenceEnabled] = useState(false);
+  const [discordClientId, setDiscordClientId] = useState("");
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
@@ -227,10 +229,12 @@ export function App() {
       .then(data => setTitles(data))
       .catch(err => setError("Failed to retrieve history: " + err));
 
-    callNative<{ proxy_url: string, search_provider: string }>("get_settings")
+    callNative<{ proxy_url: string, search_provider: string, discord_presence_enabled: boolean, discord_client_id: string }>("get_settings")
       .then(config => {
         setProxyUrl(config.proxy_url);
         setSearchProvider(config.search_provider || "animevost");
+        setDiscordPresenceEnabled(config.discord_presence_enabled || false);
+        setDiscordClientId(config.discord_client_id || "");
       })
       .catch(err => console.error("Failed to load settings:", err));
 
@@ -495,7 +499,12 @@ export function App() {
 
   const saveConfig = () => {
     setError(null);
-    callNative<any>("save_settings", JSON.stringify({ proxy_url: proxyUrl, search_provider: searchProvider }))
+    callNative<any>("save_settings", JSON.stringify({ 
+      proxy_url: proxyUrl, 
+      search_provider: searchProvider,
+      discord_presence_enabled: discordPresenceEnabled,
+      discord_client_id: discordClientId
+    }))
       .then(() => {
         setShowSettings(false);
       })
@@ -934,6 +943,28 @@ export function App() {
                       <option value="shikimori">Shikimori (Метаданные / Обнаружение аниме)</option>
                     </select>
                     <p className="text-[10px] text-muted-foreground">Какой сервис использовать для поиска на главном экране</p>
+                  </div>
+
+                  <div className="space-y-1.5 pt-4 border-t border-border">
+                    <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center justify-between">
+                      Discord Rich Presence
+                      <input
+                        type="checkbox"
+                        className="rounded border-border bg-zinc-900 text-violet-600 focus:ring-violet-500"
+                        checked={discordPresenceEnabled}
+                        onChange={(e: any) => setDiscordPresenceEnabled(e.target.checked)}
+                      />
+                    </label>
+                    <div className={`space-y-1.5 transition-all ${discordPresenceEnabled ? 'opacity-100' : 'opacity-40 pointer-events-none'}`}>
+                      <input
+                        type="text"
+                        className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-white placeholder-white/30"
+                        placeholder="Application ID (по умолчанию: 114514...)"
+                        value={discordClientId}
+                        onInput={(e: any) => setDiscordClientId(e.target.value)}
+                      />
+                      <p className="text-[10px] text-muted-foreground">Оставьте пустым для ID по умолчанию. Требуется запущенный клиент Discord.</p>
+                    </div>
                   </div>
 
                   <div className="space-y-1.5 pt-4 border-t border-border">

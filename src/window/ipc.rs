@@ -44,6 +44,7 @@ pub async fn handle_ipc(
                 if let Ok(id) = id_res {
                     let service: Arc<dyn AnimeService> = shaku::HasComponent::resolve(&*container);
                     let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                    let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
 
                     match service.get_stream(id).await {
                         Ok(stream) => {
@@ -59,6 +60,8 @@ pub async fn handle_ipc(
 
                             let _ = mpv.send_command(MpvCommand::LoadVideo(final_url));
                             let _ = mpv.send_command(MpvCommand::Play);
+                            discord.update_now_playing(stream.title.clone(), Some(stream.cover_image.clone()));
+
                             let _ = proxy.send_event(UserEvent::IpcResult {
                                   callback_id: envelope.callback_id,
                                   success: true,
@@ -77,7 +80,9 @@ pub async fn handle_ipc(
             }
             "media_pause" => {
                 let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
                 let _ = mpv.send_command(MpvCommand::Pause);
+                discord.set_paused(true);
                 let _ = proxy.send_event(UserEvent::IpcResult {
                     callback_id: envelope.callback_id,
                     success: true,
@@ -86,7 +91,9 @@ pub async fn handle_ipc(
             }
             "media_play" => {
                 let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
                 let _ = mpv.send_command(MpvCommand::Play);
+                discord.set_paused(false);
                 let _ = proxy.send_event(UserEvent::IpcResult {
                     callback_id: envelope.callback_id,
                     success: true,
@@ -95,7 +102,9 @@ pub async fn handle_ipc(
             }
             "media_stop" => {
                 let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
                 let _ = mpv.send_command(MpvCommand::Stop);
+                discord.clear();
                 let _ = proxy.send_event(UserEvent::IpcResult {
                     callback_id: envelope.callback_id,
                     success: true,
@@ -198,13 +207,14 @@ pub async fn handle_ipc(
                     success: true,
                     data: json!(config),
                 });
-            }
             "save_settings" => {
                 if let Ok(new_config) = serde_json::from_str::<crate::services::config::AppConfig>(&envelope.payload) {
                     let proxy_clone = proxy.clone();
                     let callback_id = envelope.callback_id.clone();
+                    let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
                     match crate::services::config::save_config(&new_config) {
                         Ok(_) => {
+                            discord.refresh();
                             let _ = proxy_clone.send_event(UserEvent::IpcResult {
                                 callback_id,
                                 success: true,
@@ -212,6 +222,8 @@ pub async fn handle_ipc(
                             });
                         }
                         Err(e) => {
+            ...
+
                             let _ = proxy_clone.send_event(UserEvent::IpcResult {
                                 callback_id,
                                 success: false,
@@ -373,7 +385,9 @@ pub async fn handle_ipc(
                     };
 
                     let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
-                    let _ = mpv.send_command(MpvCommand::SetAnime4K(mode));
+                    let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
+                    let _ = mpv.send_command(MpvCommand::SetAnime4K(mode.clone()));
+                    discord.set_anime4k(mode);
                     let _ = proxy.send_event(UserEvent::IpcResult {
                         callback_id: envelope.callback_id,
                         success: true,

@@ -31,6 +31,7 @@ reqwest = { version = "0.12", features = ["json", "blocking"] }
 scraper = "0.27.0"
 html-escape = "0.2"
 raw-window-handle = "0.6"
+discord-rich-presence = "1.1"
 
 [build-dependencies]
 tonic-build = "0.12"

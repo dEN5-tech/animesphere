@@ -6,6 +6,7 @@ use crate::services::jutsu::JutsuServiceImpl;
 use crate::services::animego::AnimegoServiceImpl;
 use crate::services::shikimori::ShikimoriServiceImpl;
 use crate::services::provider_manager::ProviderManagerImpl;
+use crate::services::discord_presence::DiscordPresenceServiceImpl;
 
 module! {
     pub AppModule {
@@ -16,7 +17,8 @@ module! {
             JutsuServiceImpl,
             AnimegoServiceImpl,
             ShikimoriServiceImpl,
-            ProviderManagerImpl
+            ProviderManagerImpl,
+            DiscordPresenceServiceImpl
         ],
         providers = []
     }

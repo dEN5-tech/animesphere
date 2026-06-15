@@ -6,6 +6,7 @@ pub mod jutsu;
 pub mod animego;
 pub mod shikimori;
 pub mod provider_manager;
+pub mod discord_presence;
 
 use shaku::Interface;
 use crate::error::AppError;
@@ -97,6 +98,14 @@ pub trait AnimeService: Interface + Send + Sync {
 pub trait MpvService: Interface + Send + Sync {
     fn send_command(&self, cmd: MpvCommand) -> Result<(), AppError>;
     fn subscribe(&self) -> tokio::sync::broadcast::Receiver<PlaybackEvent>;
+}
+
+pub trait DiscordPresenceService: Interface + Send + Sync {
+    fn update_now_playing(&self, title: String, cover_url: Option<String>);
+    fn set_paused(&self, paused: bool);
+    fn set_anime4k(&self, mode: Anime4KMode);
+    fn clear(&self);
+    fn refresh(&self);
 }
 
 pub use animevost::{AnimeVostTitle, AnimeVostEpisode};
