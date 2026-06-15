@@ -1,0 +1,124 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgA" x1="142" y1="84" x2="1458" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#090B17"/>
+      <stop offset="0.5" stop-color="#11152A"/>
+      <stop offset="1" stop-color="#070914"/>
+    </linearGradient>
+    <radialGradient id="glowViolet" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1155 250) rotate(136.151) scale(624.812 488.741)">
+      <stop stop-color="#8B5CF6" stop-opacity="0.78"/>
+      <stop offset="0.45" stop-color="#5B3FD2" stop-opacity="0.29"/>
+      <stop offset="1" stop-color="#5B3FD2" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glowCyan" cx="0" cy="0" r="1" gradientUnits="userSpaceOnUse" gradientTransform="translate(1180 650) rotate(180) scale(474 350)">
+      <stop stop-color="#27D3FF" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#27D3FF" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="panelStroke" x1="352" y1="164" x2="1264" y2="778" gradientUnits="userSpaceOnUse">
+      <stop stop-color="white" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="white" stop-opacity="0.06"/>
+    </linearGradient>
+    <linearGradient id="sphere" x1="920" y1="204" x2="1236" y2="584" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B58CFF"/>
+      <stop offset="0.48" stop-color="#6F52E5"/>
+      <stop offset="1" stop-color="#2A1C75"/>
+    </linearGradient>
+    <linearGradient id="badge" x1="0" y1="0" x2="164" y2="42" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7C3AED"/>
+      <stop offset="1" stop-color="#4F46E5"/>
+    </linearGradient>
+    <filter id="blurSoft" x="-150" y="-150" width="1900" height="1200" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="60"/>
+    </filter>
+    <filter id="cardShadow" x="266" y="101" width="1068" height="700" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="30" flood-color="#000000" flood-opacity="0.38"/>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bgA)"/>
+  <g filter="url(#blurSoft)">
+    <ellipse cx="1180" cy="250" rx="280" ry="170" fill="url(#glowViolet)"/>
+    <ellipse cx="1176" cy="651" rx="210" ry="120" fill="url(#glowCyan)"/>
+    <ellipse cx="383" cy="796" rx="238" ry="90" fill="#6D28D9" fill-opacity="0.18"/>
+  </g>
+
+  <g opacity="0.22">
+    <path d="M115 112H1485" stroke="white" stroke-opacity="0.14"/>
+    <path d="M115 188H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 264H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 340H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 416H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 492H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 568H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 644H1485" stroke="white" stroke-opacity="0.06"/>
+    <path d="M115 720H1485" stroke="white" stroke-opacity="0.06"/>
+  </g>
+
+  <g filter="url(#cardShadow)">
+    <rect x="300" y="134" width="1000" height="634" rx="34" fill="#101425" fill-opacity="0.76"/>
+    <rect x="300.75" y="134.75" width="998.5" height="632.5" rx="33.25" stroke="url(#panelStroke)" stroke-width="1.5"/>
+  </g>
+
+  <rect x="340" y="174" width="314" height="24" rx="12" fill="#7C3AED" fill-opacity="0.16"/>
+  <text x="360" y="191" fill="#C4B5FD" font-family="Segoe UI, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="0.16em">NATIVE DESKTOP ANIME PLAYER</text>
+
+  <text x="340" y="286" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="92" font-weight="800">AnimeSphere</text>
+  <text x="342" y="336" fill="#B6C0E0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="500">Rust + Preact anime client with mpv playback, multi-provider imports,</text>
+  <text x="342" y="374" fill="#B6C0E0" font-family="Segoe UI, Arial, sans-serif" font-size="28" font-weight="500">local gRPC metadata flow, proxy-aware fetching, and Anime4K enhancement.</text>
+
+  <g transform="translate(340 432)">
+    <rect width="164" height="42" rx="21" fill="url(#badge)"/>
+    <text x="24" y="27" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Anime4K Ready</text>
+  </g>
+  <g transform="translate(520 432)">
+    <rect width="118" height="42" rx="21" fill="#161C31" stroke="white" stroke-opacity="0.12"/>
+    <text x="26" y="27" fill="#DDE5FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Native MPV</text>
+  </g>
+  <g transform="translate(654 432)">
+    <rect width="142" height="42" rx="21" fill="#161C31" stroke="white" stroke-opacity="0.12"/>
+    <text x="26" y="27" fill="#DDE5FF" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="700">Local gRPC</text>
+  </g>
+
+  <g transform="translate(340 520)">
+    <rect width="392" height="168" rx="24" fill="#12182B" stroke="white" stroke-opacity="0.08"/>
+    <text x="28" y="40" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="24" font-weight="700">Service map</text>
+    <circle cx="34" cy="75" r="6" fill="#8B5CF6"/>
+    <text x="54" y="82" fill="#D8DEEE" font-family="Segoe UI, Arial, sans-serif" font-size="18">Wry + Tao desktop shell</text>
+    <circle cx="34" cy="108" r="6" fill="#8B5CF6"/>
+    <text x="54" y="115" fill="#D8DEEE" font-family="Segoe UI, Arial, sans-serif" font-size="18">Provider adapters: AnimeVost / Jut.su / AnimeGO / Shikimori</text>
+    <circle cx="34" cy="141" r="6" fill="#8B5CF6"/>
+    <text x="54" y="148" fill="#D8DEEE" font-family="Segoe UI, Arial, sans-serif" font-size="18">mpv actor thread with live shader switching</text>
+  </g>
+
+  <g transform="translate(770 198)">
+    <rect width="478" height="470" rx="32" fill="#0D1121" stroke="white" stroke-opacity="0.1"/>
+    <rect x="26" y="24" width="132" height="12" rx="6" fill="white" fill-opacity="0.08"/>
+    <rect x="26" y="52" width="202" height="10" rx="5" fill="white" fill-opacity="0.06"/>
+
+    <circle cx="288" cy="184" r="132" fill="url(#sphere)"/>
+    <circle cx="318" cy="152" r="32" fill="white" fill-opacity="0.16"/>
+    <path d="M249 164L249 204L321 184L249 164Z" fill="white"/>
+
+    <rect x="40" y="332" width="190" height="98" rx="20" fill="#141B31" stroke="white" stroke-opacity="0.08"/>
+    <text x="58" y="360" fill="#9FB3F8" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="0.14em">PROVIDERS</text>
+    <text x="58" y="392" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">AnimeVost</text>
+    <text x="58" y="417" fill="#D4DCF6" font-family="Segoe UI, Arial, sans-serif" font-size="16">Jut.su · AnimeGO</text>
+
+    <rect x="248" y="332" width="190" height="98" rx="20" fill="#141B31" stroke="white" stroke-opacity="0.08"/>
+    <text x="266" y="360" fill="#9FB3F8" font-family="Segoe UI, Arial, sans-serif" font-size="15" font-weight="700" letter-spacing="0.14em">UPSCALE</text>
+    <text x="266" y="392" fill="white" font-family="Segoe UI, Arial, sans-serif" font-size="18" font-weight="600">Mode A / B / C</text>
+    <text x="266" y="417" fill="#D4DCF6" font-family="Segoe UI, Arial, sans-serif" font-size="16">S · M · L · VL · UL</text>
+  </g>
+
+  <g transform="translate(1168 149)">
+    <rect width="88" height="26" rx="13" fill="#181F37" stroke="white" stroke-opacity="0.1"/>
+    <text x="17" y="18" fill="#C8D1F2" font-family="Segoe UI, Arial, sans-serif" font-size="13" font-weight="700">RUST CORE</text>
+  </g>
+
+  <g transform="translate(1118 696)">
+    <rect width="138" height="32" rx="16" fill="#181F37" stroke="white" stroke-opacity="0.1"/>
+    <text x="22" y="21" fill="#C8D1F2" font-family="Segoe UI, Arial, sans-serif" font-size="14" font-weight="700">PREACT UI LAYER</text>
+  </g>
+
+  <text x="340" y="804" fill="#7E8AAD" font-family="Segoe UI, Arial, sans-serif" font-size="18">Desktop anime streaming shell • Embedded webview UI • Real-time player controls • README hero artwork</text>
+</svg>
