@@ -89,6 +89,11 @@ jobs:
 
     - name: Build Rust application
       run: |
+        HOMEBREW_PREFIX="$(brew --prefix)"
+        MPV_PREFIX="$(brew --prefix mpv)"
+        export LIBRARY_PATH="$MPV_PREFIX/lib:$HOMEBREW_PREFIX/lib:${LIBRARY_PATH:-}"
+        export DYLD_FALLBACK_LIBRARY_PATH="$MPV_PREFIX/lib:$HOMEBREW_PREFIX/lib:${DYLD_FALLBACK_LIBRARY_PATH:-}"
+        export PKG_CONFIG_PATH="$MPV_PREFIX/lib/pkgconfig:$HOMEBREW_PREFIX/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
         cargo build --release
 
     - name: Package macOS Release Archive
