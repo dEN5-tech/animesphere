@@ -3,6 +3,7 @@ name: CI Build (macOS & Linux)
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
 
@@ -42,11 +43,14 @@ jobs:
         export PROTOC=/usr/bin/protoc
         cargo build --release
 
+    - name: Rename binary for release
+      run: mv target/release/animesphere target/release/animesphere-linux-x86_64
+
     - name: Upload Linux Binary Artifact
       uses: actions/upload-artifact@v4
       with:
         name: animesphere-linux
-        path: target/release/animesphere
+        path: target/release/animesphere-linux-x86_64
 
   build-macos:
     name: Build macOS Client
@@ -82,8 +86,41 @@ jobs:
       run: |
         cargo build --release
 
+    - name: Rename binary for release
+      run: mv target/release/animesphere target/release/animesphere-macos-x86_64
+
     - name: Upload macOS Binary Artifact
       uses: actions/upload-artifact@v4
       with:
         name: animesphere-macos
-        path: target/release/animesphere
+        path: target/release/animesphere-macos-x86_64
+
+  publish:
+    name: Create GitHub Release
+    needs: [build-linux, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+    - name: Download Linux Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: animesphere-linux
+        path: ./artifacts
+
+    - name: Download macOS Artifact
+      uses: actions/download-artifact@v4
+      with:
+        name: animesphere-macos
+        path: ./artifacts
+
+    - name: Create GitHub Release and Upload Assets
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          ./artifacts/animesphere-linux-x86_64
+          ./artifacts/animesphere-macos-x86_64
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
