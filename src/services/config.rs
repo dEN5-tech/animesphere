@@ -161,3 +161,56 @@ pub fn save_history(history: &Vec<HistoryTitle>) -> Result<(), String> {
     file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
     Ok(())
 }
+
+// ─── Resume Playback ────────────────────────────────────────────────────────
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ResumeState {
+    /// ID of the episode in the local catalog
+    pub episode_id: i32,
+    /// Playback position in seconds
+    pub time_pos: f64,
+    /// Human-readable episode title (e.g. "My Hero Academia S2 - Ep 3")
+    pub episode_title: String,
+    /// Top-level anime / series title shown in the banner
+    pub anime_title: String,
+    /// Poster image URL
+    pub cover_image: String,
+    /// Description / URL used to re-select the provider
+    pub description: String,
+}
+
+pub fn get_resume_path() -> PathBuf {
+    get_config_dir().join("resume.json")
+}
+
+pub fn load_resume() -> Option<ResumeState> {
+    ensure_config_dir();
+    let path = get_resume_path();
+    if !path.exists() {
+        return None;
+    }
+    if let Ok(mut file) = File::open(&path) {
+        let mut content = String::new();
+        if file.read_to_string(&mut content).is_ok() {
+            return serde_json::from_str::<ResumeState>(&content).ok();
+        }
+    }
+    None
+}
+
+pub fn save_resume(state: &ResumeState) -> Result<(), String> {
+    ensure_config_dir();
+    let content = serde_json::to_string_pretty(state).map_err(|e| e.to_string())?;
+    let mut file = File::create(get_resume_path()).map_err(|e| e.to_string())?;
+    file.write_all(content.as_bytes()).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn clear_resume() -> Result<(), String> {
+    let path = get_resume_path();
+    if path.exists() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}

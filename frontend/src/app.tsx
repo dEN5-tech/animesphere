@@ -53,6 +53,16 @@ export function App() {
   const [shikimoriBookmarks, setShikimoriBookmarks] = useState<any[]>([]);
   const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(false);
 
+  // ─── Resume Playback State ────────────────────────────────────────────────
+  const [resumeData, setResumeData] = useState<any | null>(null);
+  const [resumeDismissed, setResumeDismissed] = useState(false);
+
+  useEffect(() => {
+    callNative<any>('get_resume')
+      .then(data => { if (data) setResumeData(data); })
+      .catch(() => {});
+  }, []);
+
   const loadBookmarks = async () => {
     setIsLoadingBookmarks(true);
     setError(null);
@@ -217,24 +227,65 @@ export function App() {
     }
     setImporting(true);
     setError(null);
-    callNative<any>("select_anime", JSON.stringify(title))
-      .then(() => callNative<any>("fetch_catalog"))
+    callNative<any>('select_anime', JSON.stringify(title))
+      .then(() => callNative<any>('fetch_catalog'))
       .then(episodes => {
         setAnimeList(episodes);
         if (episodes.length > 0) {
-            playAnime(episodes[0].id);
+          playAnime(episodes[0].id, {
+            anime_title: title.title.split(' - ')[0],
+            cover_image: title.cover_image,
+            description: title.description,
+          });
         } else {
-          setError("Этот провайдер предоставляет только метаданные (поиск/описание) — видеопотоков нет. Используйте AnimeGO, Jut.su или AnimeVost для просмотра.");
+          setError('Этот провайдер предоставляет только метаданные — видеопотоков нет. Используйте AnimeGO, Jut.su или AnimeVost для просмотра.');
         }
       })
-      .catch(err => setError("Ошибка при открытии аниме: " + err))
+      .catch(err => setError('Ошибка при открытии аниме: ' + err))
+      .finally(() => setImporting(false));
+  };
+
+  // Restore a previously saved playback session
+  const resumePlayback = () => {
+    if (!resumeData) return;
+    setImporting(true);
+    setError(null);
+    const fakeTitle: AnimeTitle = {
+      id: resumeData.episode_id,
+      title: resumeData.anime_title,
+      description: resumeData.description,
+      cover_image: resumeData.cover_image,
+    };
+    const seekTo: number = resumeData.time_pos || 0;
+    callNative<any>('select_anime', JSON.stringify(fakeTitle))
+      .then(() => callNative<any>('fetch_catalog'))
+      .then(episodes => {
+        setAnimeList(episodes);
+        const targetEp = episodes.find((e: any) => e.id === resumeData.episode_id) || episodes[0];
+        if (targetEp) {
+          playAnime(targetEp.id, {
+            anime_title: resumeData.anime_title,
+            cover_image: resumeData.cover_image,
+            description: resumeData.description,
+          });
+          if (seekTo > 5) {
+            setTimeout(() => {
+              callNative<void>('media_seek', seekTo.toString()).catch(() => {});
+            }, 2500);
+          }
+          callNative('clear_resume').catch(() => {});
+          setResumeData(null);
+          setResumeDismissed(false);
+        }
+      })
+      .catch(err => setError('Ошибка при восстановлении просмотра: ' + err))
       .finally(() => setImporting(false));
   };
 
 
   const saveConfig = () => {
     setError(null);
-    callNative<any>("save_settings", JSON.stringify({
+    callNative<any>('save_settings', JSON.stringify({
       proxy_url: proxyUrl,
       search_provider: searchProvider,
       discord_presence_enabled: discordPresenceEnabled,
@@ -246,21 +297,31 @@ export function App() {
         setShowSettings(false);
       })
       .catch(err => {
-        setError("Ошибка сохранения настроек: " + err);
+        setError('Ошибка сохранения настроек: ' + err);
       });
   };
 
   const playNext = () => {
     const currentIndex = animeList.findIndex(anime => anime.title === activeMedia);
     if (currentIndex !== -1 && currentIndex + 1 < animeList.length) {
-      playAnime(animeList[currentIndex + 1].id);
+      const next = animeList[currentIndex + 1];
+      playAnime(next.id, {
+        anime_title: next.title.split(' - ')[0],
+        cover_image: next.cover_image,
+        description: next.description,
+      });
     }
   };
 
   const playPrev = () => {
     const currentIndex = animeList.findIndex(anime => anime.title === activeMedia);
     if (currentIndex > 0) {
-      playAnime(animeList[currentIndex - 1].id);
+      const prev = animeList[currentIndex - 1];
+      playAnime(prev.id, {
+        anime_title: prev.title.split(' - ')[0],
+        cover_image: prev.cover_image,
+        description: prev.description,
+      });
     }
   };
 
@@ -596,6 +657,72 @@ export function App() {
             {/* TAB CONTENTS */}
             {currentTab === 'home' && (
               <div className="space-y-8">
+
+                {/* ── Resume Banner ── */}
+                {resumeData && !resumeDismissed && (
+                  <div className="relative flex gap-4 p-4 rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-950/40 via-zinc-900/60 to-indigo-950/30 backdrop-blur-xl shadow-xl overflow-hidden">
+                    {/* Blurred cover art background */}
+                    {resumeData.cover_image && (
+                      <div
+                        className="absolute inset-0 bg-cover bg-center opacity-10 blur-sm scale-105"
+                        style={{ backgroundImage: `url(${getProxiedImageUrl(resumeData.cover_image)})` }}
+                      />
+                    )}
+                    {/* Cover thumbnail */}
+                    <div
+                      className="relative shrink-0 w-16 h-20 rounded-xl bg-cover bg-center border border-white/10 shadow-lg"
+                      style={resumeData.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(resumeData.cover_image)})` } : {}}
+                    />
+                    {/* Info */}
+                    <div className="relative flex-grow flex flex-col justify-between min-w-0 py-0.5">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-0.5">Продолжить просмотр</p>
+                        <h3 className="text-base font-bold text-white line-clamp-1">{resumeData.anime_title}</h3>
+                        <p className="text-xs text-white/50 line-clamp-1 mt-0.5">{resumeData.episode_title}</p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-2">
+                        {/* Progress bar */}
+                        <div className="flex-grow h-1 rounded-full bg-white/10 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all"
+                            style={{ width: `${Math.min(100, (resumeData.time_pos / 1440) * 100)}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] font-mono text-violet-300 shrink-0">
+                          {formatTime(resumeData.time_pos)}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Action buttons */}
+                    <div className="relative flex flex-col gap-2 justify-center shrink-0">
+                      <button
+                        onClick={resumePlayback}
+                        disabled={importing}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-xs font-bold transition-all shadow-lg shadow-violet-600/30 disabled:opacity-50"
+                      >
+                        <Play className="h-3.5 w-3.5 fill-current" />
+                        Продолжить
+                      </button>
+                      <button
+                        onClick={() => {
+                          callNative('clear_resume').catch(() => {});
+                          setResumeData(null);
+                          setResumeDismissed(false);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 text-white/60 hover:text-white text-xs font-semibold transition-all"
+                      >
+                        Начать заново
+                      </button>
+                    </div>
+                    {/* Dismiss X */}
+                    <button
+                      onClick={() => setResumeDismissed(true)}
+                      className="absolute top-2.5 right-2.5 text-white/30 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
                 {/* Resume Playback section if animeList is not empty */}
                 {animeList && animeList.length > 0 ? (
                   <div className="p-6 rounded-2xl border border-violet-500/10 bg-gradient-to-r from-violet-950/20 via-zinc-900/40 to-indigo-950/10 backdrop-blur flex flex-col md:flex-row items-start md:items-center justify-between gap-6">

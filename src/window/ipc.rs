@@ -673,6 +673,45 @@ pub async fn handle_ipc(
                     });
                 });
             }
+            "save_resume" => {
+                if let Ok(state) = serde_json::from_str::<crate::services::config::ResumeState>(&envelope.payload) {
+                    match crate::services::config::save_resume(&state) {
+                        Ok(_) => {
+                            let _ = proxy.send_event(UserEvent::IpcResult {
+                                callback_id: envelope.callback_id,
+                                success: true,
+                                data: json!({ "success": true }),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = proxy.send_event(UserEvent::IpcResult {
+                                callback_id: envelope.callback_id,
+                                success: false,
+                                data: json!(e),
+                            });
+                        }
+                    }
+                }
+            }
+            "get_resume" => {
+                let resume = crate::services::config::load_resume();
+                let _ = proxy.send_event(UserEvent::IpcResult {
+                    callback_id: envelope.callback_id,
+                    success: true,
+                    data: match resume {
+                        Some(r) => serde_json::to_value(r).unwrap_or(serde_json::Value::Null),
+                        None => serde_json::Value::Null,
+                    },
+                });
+            }
+            "clear_resume" => {
+                let _ = crate::services::config::clear_resume();
+                let _ = proxy.send_event(UserEvent::IpcResult {
+                    callback_id: envelope.callback_id,
+                    success: true,
+                    data: json!({ "success": true }),
+                });
+            }
             _ => {}
         }
     }

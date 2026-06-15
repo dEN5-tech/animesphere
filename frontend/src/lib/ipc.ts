@@ -177,6 +177,21 @@ export function callNative<T>(action: string, payload: string = ""): Promise<T> 
             }
           ] as unknown as T);
         }, 800);
+      } else if (action === "save_resume") {
+        try {
+          localStorage.setItem("animesphere_resume", payload);
+        } catch (_) {}
+        resolve({ success: true } as unknown as T);
+      } else if (action === "get_resume") {
+        try {
+          const raw = localStorage.getItem("animesphere_resume");
+          resolve((raw ? JSON.parse(raw) : null) as unknown as T);
+        } catch (_) {
+          resolve(null as unknown as T);
+        }
+      } else if (action === "clear_resume") {
+        localStorage.removeItem("animesphere_resume");
+        resolve({ success: true } as unknown as T);
       } else {
         resolve(undefined as unknown as T);
       }
