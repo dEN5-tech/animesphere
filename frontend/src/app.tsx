@@ -1,103 +1,41 @@
-import { useState, useEffect, useRef } from 'preact/hooks'
+import { useState, useEffect } from 'preact/hooks'
 import {
   Play, Pause, Volume2, VolumeX, SkipBack, SkipForward,
   RotateCcw, RotateCw, ArrowLeft, Search, Menu, Settings, Maximize, Minimize
 } from 'lucide-preact'
-import type { Anime, AnimeTitle, PlaybackState, Anime4KModeType, Anime4KQualityType, StreamInfo } from './types';
 import { callNative } from './lib/ipc';
 import { getProxiedImageUrl, formatTime } from './lib/utils';
 import { SettingsModal } from './components/SettingsModal';
 import { EpisodeDrawer } from './components/Player/EpisodeDrawer';
 import { Anime4kPanel } from './components/Player/Anime4kPanel';
 
+import { useSettings } from './hooks/useSettings';
+import { useLibrary } from './hooks/useLibrary';
+import { usePlayback } from './hooks/usePlayback';
+import type { AnimeTitle } from './types';
+
 export function App() {
-  const [animeList, setAnimeList] = useState<Anime[]>([]);
-  const [titles, setTitles] = useState<AnimeTitle[]>([]);
-  const [activeMedia, setActiveMedia] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showControls, setShowControls] = useState(true);
-  const controlsTimeoutRef = useRef<number | null>(null);
-
-  const [playbackState, setPlaybackState] = useState<PlaybackState>({
-    time_pos: 0,
-    duration: 0,
-    paused: true,
-    volume: 80,
-  });
-
-  const [seekingValue, setSeekingValue] = useState<number | null>(null);
-  const [vostId, setVostId] = useState("");
-  const [importing, setImporting] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [showDrawer, setShowDrawer] = useState(false);
-
-  // Anime4K shader state
-  const [anime4kMode, setAnime4kMode] = useState<Anime4KModeType>('off');
-  const [anime4kQuality, setAnime4kQuality] = useState<Anime4KQualityType>('M');
   const [showAnime4kPanel, setShowAnime4kPanel] = useState(false);
 
-  // Settings configurations
-  const [showSettings, setShowSettings] = useState(false);
-  const [proxyUrl, setProxyUrl] = useState("http://127.0.0.1:2080");
-  const [searchProvider, setSearchProvider] = useState("animevost");
-  const [discordPresenceEnabled, setDiscordPresenceEnabled] = useState(false);
-  const [discordClientId, setDiscordClientId] = useState("");
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const {
+    showSettings, setShowSettings, proxyUrl, setProxyUrl, searchProvider, setSearchProvider,
+    discordPresenceEnabled, setDiscordPresenceEnabled, discordClientId, setDiscordClientId
+  } = useSettings();
 
-  useEffect(() => {
-    callNative<Anime[]>("fetch_catalog")
-      .then(data => setAnimeList(data))
-      .catch(err => setError("Failed to retrieve catalog: " + err));
+  const {
+    animeList, setAnimeList, titles, activeMedia, setActiveMedia,
+    searchQuery, setSearchQuery, importing, setImporting, vostId, setVostId,
+    loadHistory, handleSearch, importPlaylist
+  } = useLibrary(setError);
 
-    callNative<AnimeTitle[]>("get_history")
-      .then(data => setTitles(data))
-      .catch(err => setError("Failed to retrieve history: " + err));
-
-    callNative<{ proxy_url: string, search_provider: string, discord_presence_enabled: boolean, discord_client_id: string }>("get_settings")
-      .then(config => {
-        setProxyUrl(config.proxy_url);
-        setSearchProvider(config.search_provider || "animevost");
-        setDiscordPresenceEnabled(config.discord_presence_enabled || false);
-        setDiscordClientId(config.discord_client_id || "");
-      })
-      .catch(err => console.error("Failed to load settings:", err));
-
-    window.onPlaybackUpdate = (state) => {
-      setPlaybackState(state);
-    };
-
-    return () => {
-      window.onPlaybackUpdate = undefined;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (searchQuery.trim() === "") {
-      callNative<AnimeTitle[]>("get_history")
-        .then(data => setTitles(data))
-        .catch(err => setError("Failed to retrieve history: " + err));
-    }
-  }, [searchQuery]);
-
-  useEffect(() => {
-    if (activeMedia) {
-      document.body.classList.add('playback-active');
-    } else {
-      document.body.classList.remove('playback-active');
-    }
-  }, [activeMedia]);
-
-  const resetControlsTimeout = () => {
-    setShowControls(true);
-    if (controlsTimeoutRef.current) {
-      clearTimeout(controlsTimeoutRef.current);
-    }
-    controlsTimeoutRef.current = window.setTimeout(() => {
-      if (!playbackState.paused && !showDrawer) {
-        setShowControls(false);
-      }
-    }, 3500);
-  };
+  const {
+    playbackState, seekingValue, isFullscreen, setIsFullscreen, showControls, setShowControls,
+    anime4kMode, anime4kQuality, resetControlsTimeout, controlsTimeoutRef,
+    playAnime, togglePlayback, stopAnime, toggleFullscreen,
+    handleSeekChange, handleSeekCommit, handleVolumeChange, skipSeconds, applyAnime4k
+  } = usePlayback(setActiveMedia, setError, loadHistory, searchQuery, showDrawer);
 
   useEffect(() => {
     if (activeMedia) {
@@ -117,49 +55,6 @@ export function App() {
       }
     };
   }, [activeMedia, playbackState.paused, showDrawer]);
-
-  const playAnime = (id: number) => {
-    callNative<StreamInfo>("play_stream", id.toString())
-      .then(streamInfo => {
-        setActiveMedia(streamInfo.title);
-        setSeekingValue(null);
-      })
-      .catch(err => setError("Playback initialization failed: " + err));
-  };
-
-  const togglePlayback = () => {
-    const nextPaused = !playbackState.paused;
-    callNative<void>(nextPaused ? "media_pause" : "media_play")
-      .then(() => {
-        setPlaybackState(prev => ({ ...prev, paused: nextPaused }));
-        resetControlsTimeout();
-      })
-      .catch(err => setError("Control command failed: " + err));
-  };
-
-  const stopAnime = () => {
-    callNative<void>("media_stop")
-      .then(() => {
-        setActiveMedia(null);
-        setSeekingValue(null);
-        setShowDrawer(false);
-        if (searchQuery.trim() === "") {
-          callNative<AnimeTitle[]>("get_history")
-            .then(data => setTitles(data))
-            .catch(err => console.error("Failed to reload history:", err));
-        }
-      })
-      .catch(err => setError("Stop command failed: " + err));
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(prev => {
-      const next = !prev;
-      callNative<boolean>("set_fullscreen", next.toString())
-        .catch(err => console.error("Failed to toggle fullscreen", err));
-      return next;
-    });
-  };
 
   useEffect(() => {
     if (!activeMedia) {
@@ -185,16 +80,10 @@ export function App() {
         togglePlayback();
       } else if (e.key === 'ArrowLeft') {
         e.preventDefault();
-        const target = Math.max(0, playbackState.time_pos - 10);
-        setPlaybackState(prev => ({ ...prev, time_pos: target }));
-        callNative<void>("media_seek", target.toString())
-          .catch(err => console.error(err));
+        skipSeconds(-10);
       } else if (e.key === 'ArrowRight') {
         e.preventDefault();
-        const target = Math.min(playbackState.duration, playbackState.time_pos + 10);
-        setPlaybackState(prev => ({ ...prev, time_pos: target }));
-        callNative<void>("media_seek", target.toString())
-          .catch(err => console.error(err));
+        skipSeconds(10);
       }
     };
 
@@ -204,122 +93,23 @@ export function App() {
     };
   }, [activeMedia, isFullscreen, playbackState.time_pos, playbackState.duration]);
 
-  const handleSeekChange = (e: any) => {
-    const val = parseFloat(e.target.value);
-    setSeekingValue(val);
-  };
-
-  const handleSeekCommit = (e: any) => {
-    const val = parseFloat(e.target.value);
-    setSeekingValue(null);
-    callNative<void>("media_seek", val.toString())
-      .catch(err => setError("Seek command failed: " + err));
-  };
-
-  const handleVolumeChange = (e: any) => {
-    const val = parseFloat(e.target.value);
-    setPlaybackState(prev => ({ ...prev, volume: val }));
-    callNative<void>("media_volume", val.toString())
-      .catch(err => setError("Volume command failed: " + err));
-  };
-
-  const skipSeconds = (amount: number) => {
-    const current = seekingValue !== null ? seekingValue : playbackState.time_pos;
-    const target = Math.max(0, Math.min(playbackState.duration, current + amount));
-    callNative<void>("media_seek", target.toString())
-      .catch(err => setError("Skip command failed: " + err));
-  };
-
-  const handleSearch = () => {
-    if (!searchQuery.trim()) return;
-    const query = searchQuery.trim();
-    if (query.startsWith("http") && query.includes("jut.su")) {
-      const dummyTitle = {
-        id: -1,
-        title: "Импорт с Jut.su",
-        description: query,
-        cover_image: ""
-      };
-      selectTitle(dummyTitle);
-      return;
-    }
-    setImporting(true);
-    setError(null);
-    callNative<AnimeTitle[]>("search_animevost", query)
-      .then(data => {
-        setTitles(data);
-      })
-      .catch(err => {
-        setError("Ошибка поиска: " + err);
-      })
-      .finally(() => {
-        setImporting(false);
-      });
-  };
-
-  const selectTitle = (title: AnimeTitle) => {
+  const onSelectTitle = (title: AnimeTitle) => {
     setImporting(true);
     setError(null);
     callNative<any>("select_anime", JSON.stringify(title))
-      .then(() => {
-        return callNative<Anime[]>("fetch_catalog");
-      })
+      .then(() => callNative<any>("fetch_catalog"))
       .then(episodes => {
         setAnimeList(episodes);
         if (episodes.length > 0) {
-          playAnime(episodes[0].id);
+            playAnime(episodes[0].id);
         } else {
           setError("Этот провайдер предоставляет только метаданные (поиск/описание) — видеопотоков нет. Используйте AnimeGO, Jut.su или AnimeVost для просмотра.");
         }
       })
-      .catch(err => {
-        setError("Ошибка при открытии аниме: " + err);
-      })
-      .finally(() => {
-        setImporting(false);
-      });
+      .catch(err => setError("Ошибка при открытии аниме: " + err))
+      .finally(() => setImporting(false));
   };
 
-  const importPlaylist = () => {
-    const val = vostId.trim();
-    if (!val) {
-      setError("Укажите числовой ID или URL");
-      return;
-    }
-
-    const isUrl = val.startsWith("http");
-    if (!isUrl) {
-      const id = parseInt(val, 10);
-      if (isNaN(id) || id <= 0) {
-        setError("Укажите корректный числовой ID или URL");
-        return;
-      }
-    }
-
-    setImporting(true);
-    setError(null);
-    callNative<any>("import_animevost", val)
-      .then(() => {
-        setVostId("");
-        return callNative<Anime[]>("fetch_catalog");
-      })
-      .then(data => {
-        setAnimeList(data);
-      })
-      .catch(err => {
-        setError("Ошибка импорта: " + err);
-      })
-      .finally(() => {
-        setImporting(false);
-      });
-  };
-
-  const applyAnime4k = (mode: Anime4KModeType, quality: Anime4KQualityType) => {
-    setAnime4kMode(mode);
-    setAnime4kQuality(quality);
-    callNative<void>('set_anime4k', JSON.stringify({ mode, quality }))
-      .catch(err => console.error('Anime4K command failed:', err));
-  };
 
   const saveConfig = () => {
     setError(null);
@@ -370,7 +160,7 @@ export function App() {
           {/* Top Bar */}
           <div className={`relative z-10 bg-gradient-to-b from-black/95 to-transparent p-6 flex items-center gap-4 pointer-events-auto transform transition-transform duration-300 ${showControls ? 'translate-y-0' : '-translate-y-full'}`}>
             <button
-              onClick={stopAnime}
+              onClick={() => { stopAnime(); setShowDrawer(false); }}
               className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 hover:text-white transition-colors pointer-events-auto"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -573,7 +363,7 @@ export function App() {
               <div
                 key={title.id} 
                 className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
-                onClick={() => selectTitle(title)}
+                onClick={() => onSelectTitle(title)}
               >
                 <div
                   className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
