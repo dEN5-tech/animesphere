@@ -10,6 +10,10 @@ pub struct AppConfig {
     pub search_provider: String,
     pub discord_presence_enabled: bool,
     pub discord_client_id: String,
+    pub shikimori_client_id: String,
+    pub shikimori_client_secret: String,
+    pub shikimori_access_token: String,
+    pub shikimori_refresh_token: String,
 }
 
 impl Default for AppConfig {
@@ -19,6 +23,10 @@ impl Default for AppConfig {
             search_provider: "animevost".to_string(),
             discord_presence_enabled: false,
             discord_client_id: String::new(),
+            shikimori_client_id: "bwmocDw1B9Rq7Wp-DEMzYn1umJHm1FC651k0UomysEY".to_string(),
+            shikimori_client_secret: "EKkI8rKmmywnvWKB4psgA-8JKF0ultUKIYfimytqwoA".to_string(),
+            shikimori_access_token: String::new(),
+            shikimori_refresh_token: String::new(),
         }
     }
 }
@@ -72,20 +80,36 @@ pub fn ensure_config_dir() {
 pub fn load_config() -> AppConfig {
     ensure_config_dir();
     let path = get_config_path();
-    if path.exists() {
+    let mut config = if path.exists() {
         if let Ok(mut file) = File::open(&path) {
             let mut content = String::new();
             if file.read_to_string(&mut content).is_ok() {
-                if let Ok(config) = serde_json::from_str::<AppConfig>(&content) {
-                    return config;
-                }
+                serde_json::from_str::<AppConfig>(&content).unwrap_or_else(|_| AppConfig::default())
+            } else {
+                AppConfig::default()
             }
+        } else {
+            AppConfig::default()
         }
+    } else {
+        AppConfig::default()
+    };
+
+    // Auto-seed default credentials if empty
+    let mut needs_save = false;
+    if config.shikimori_client_id.trim().is_empty() {
+        config.shikimori_client_id = "bwmocDw1B9Rq7Wp-DEMzYn1umJHm1FC651k0UomysEY".to_string();
+        needs_save = true;
     }
-    
-    let default_config = AppConfig::default();
-    let _ = save_config(&default_config);
-    default_config
+    if config.shikimori_client_secret.trim().is_empty() {
+        config.shikimori_client_secret = "EKkI8rKmmywnvWKB4psgA-8JKF0ultUKIYfimytqwoA".to_string();
+        needs_save = true;
+    }
+
+    if needs_save {
+        let _ = save_config(&config);
+    }
+    config
 }
 
 pub fn save_config(config: &AppConfig) -> Result<(), String> {

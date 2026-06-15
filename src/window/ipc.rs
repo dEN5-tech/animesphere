@@ -58,9 +58,15 @@ pub async fn handle_ipc(
                                 }
                             };
 
-                            let _ = mpv.send_command(MpvCommand::LoadVideo(final_url));
+                            let _ = mpv.send_command(MpvCommand::LoadVideo(final_url.clone()));
                             let _ = mpv.send_command(MpvCommand::Play);
                             discord.update_now_playing(stream.title.clone(), Some(stream.cover_image.clone()));
+
+                            let thumbnail_service: Arc<dyn crate::services::ThumbnailService> = shaku::HasComponent::resolve(&*container);
+                            let final_url_clone = final_url.clone();
+                            tokio::spawn(async move {
+                                let _ = thumbnail_service.load_video(final_url_clone).await;
+                            });
 
                             let _ = proxy.send_event(UserEvent::IpcResult {
                                   callback_id: envelope.callback_id,
@@ -207,8 +213,13 @@ pub async fn handle_ipc(
                     success: true,
                     data: json!(config),
                 });
+            }
             "save_settings" => {
-                if let Ok(new_config) = serde_json::from_str::<crate::services::config::AppConfig>(&envelope.payload) {
+                if let Ok(mut new_config) = serde_json::from_str::<crate::services::config::AppConfig>(&envelope.payload) {
+                    let current_config = crate::services::config::load_config();
+                    new_config.shikimori_access_token = current_config.shikimori_access_token;
+                    new_config.shikimori_refresh_token = current_config.shikimori_refresh_token;
+
                     let proxy_clone = proxy.clone();
                     let callback_id = envelope.callback_id.clone();
                     let discord: Arc<dyn crate::services::DiscordPresenceService> = shaku::HasComponent::resolve(&*container);
@@ -222,8 +233,6 @@ pub async fn handle_ipc(
                             });
                         }
                         Err(e) => {
-            ...
-
                             let _ = proxy_clone.send_event(UserEvent::IpcResult {
                                 callback_id,
                                 success: false,
@@ -402,6 +411,266 @@ pub async fn handle_ipc(
                     callback_id: envelope.callback_id,
                     success: true,
                     data: json!({ "success": true }),
+                });
+            }
+            "get_thumbnail" => {
+                if let Ok(time) = envelope.payload.parse::<f64>() {
+                    let thumbnail_service: Arc<dyn crate::services::ThumbnailService> = shaku::HasComponent::resolve(&*container);
+                    let proxy_clone = proxy.clone();
+                    let callback_id = envelope.callback_id.clone();
+                    tokio::spawn(async move {
+                        match thumbnail_service.get_thumbnail(time).await {
+                            Ok(b64) => {
+                                let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                    callback_id,
+                                    success: true,
+                                    data: json!({ "thumbnail": format!("data:image/jpeg;base64,{}", b64) }),
+                                });
+                            }
+                            Err(e) => {
+                                let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                    callback_id,
+                                    success: false,
+                                    data: json!(e.to_string()),
+                                });
+                            }
+                        }
+                    });
+                }
+            }
+            "shikimori_login" => {
+                let shikimori: Arc<dyn crate::services::ShikimoriService> = shaku::HasComponent::resolve(&*container);
+                let proxy_clone = proxy.clone();
+                let callback_id = envelope.callback_id.clone();
+                tokio::spawn(async move {
+                    match shikimori.start_auth_flow().await {
+                        Ok(_) => {
+                            let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                callback_id,
+                                success: true,
+                                data: json!({ "success": true }),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                callback_id,
+                                success: false,
+                                data: json!(e.to_string()),
+                            });
+                        }
+                    }
+                });
+            }
+            "shikimori_status" => {
+                let config = crate::services::config::load_config();
+                let is_authorized = !config.shikimori_access_token.trim().is_empty();
+                if is_authorized {
+                    let shikimori: Arc<dyn crate::services::ShikimoriService> = shaku::HasComponent::resolve(&*container);
+                    let proxy_clone = proxy.clone();
+                    let callback_id = envelope.callback_id.clone();
+                    tokio::spawn(async move {
+                        match shikimori.get_user_profile().await {
+                            Ok(profile) => {
+                                let nickname = profile.get("nickname").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                let mut avatar = profile.get("avatar").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                if !avatar.is_empty() && !avatar.starts_with("http") {
+                                    avatar = format!("https://shikimori.one{}", avatar);
+                                }
+                                let url = profile.get("url").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                
+                                let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                    callback_id,
+                                    success: true,
+                                    data: json!({
+                                        "authorized": true,
+                                        "profile": {
+                                            "nickname": nickname,
+                                            "avatar": avatar,
+                                            "url": url
+                                        }
+                                    }),
+                                });
+                            }
+                            Err(e) => {
+                                println!("Failed to fetch Shikimori profile details: {}", e);
+                                let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                    callback_id,
+                                    success: true,
+                                    data: json!({
+                                        "authorized": true,
+                                        "profile": null
+                                    }),
+                                });
+                            }
+                        }
+                    });
+                } else {
+                    let _ = proxy.send_event(UserEvent::IpcResult {
+                        callback_id: envelope.callback_id,
+                        success: true,
+                        data: json!({ "authorized": false, "profile": null }),
+                    });
+                }
+            }
+            "open_browser" => {
+                let url = envelope.payload.clone();
+                let _ = open::that(&url);
+                let _ = proxy.send_event(UserEvent::IpcResult {
+                    callback_id: envelope.callback_id,
+                    success: true,
+                    data: json!({ "success": true }),
+                });
+            }
+            "shikimori_bookmarks" => {
+                let shikimori: Arc<dyn crate::services::ShikimoriService> = shaku::HasComponent::resolve(&*container);
+                let proxy_clone = proxy.clone();
+                let callback_id = envelope.callback_id.clone();
+                tokio::spawn(async move {
+                    match shikimori.get_user_bookmarks(80).await {
+                        Ok(bookmarks) => {
+                            let mut results = Vec::new();
+                            if let Some(arr) = bookmarks.as_array() {
+                                for item in arr {
+                                    if let Some(anime) = item.get("anime") {
+                                        let anime_id = anime.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
+                                        let ru_name = anime.get("russian").and_then(|v| v.as_str()).unwrap_or("");
+                                        let en_name = anime.get("name").and_then(|v| v.as_str()).unwrap_or("");
+                                        let title = if !ru_name.is_empty() { ru_name } else { en_name };
+                                        
+                                        let mut cover_image = String::new();
+                                        if let Some(img_obj) = anime.get("image") {
+                                            if let Some(orig) = img_obj.get("original").and_then(|v| v.as_str()) {
+                                                cover_image = if orig.starts_with("http") {
+                                                    orig.to_string()
+                                                } else {
+                                                    format!("https://shikimori.one{}", orig)
+                                                };
+                                            }
+                                        }
+
+                                        let status_key = item.get("status").and_then(|v| v.as_str()).unwrap_or("");
+                                        let status_ru = match status_key {
+                                            "planned" => "В планах",
+                                            "watching" => "Смотрю",
+                                            "completed" => "Просмотрено",
+                                            "on_hold" => "Отложено",
+                                            "dropped" => "Брошено",
+                                            "rewatching" => "Пересматриваю",
+                                            other => other,
+                                        };
+
+                                        let episodes_watched = item.get("episodes").and_then(|v| v.as_i64()).unwrap_or(0);
+                                        let score = item.get("score").and_then(|v| v.as_i64()).unwrap_or(0);
+                                        
+                                        let mut desc = format!("Статус: {}", status_ru);
+                                        if episodes_watched > 0 {
+                                            desc = format!("{}, серий: {}", desc, episodes_watched);
+                                        }
+                                        if score > 0 {
+                                            desc = format!("{}, оценка: {}/10", desc, score);
+                                        }
+
+                                        results.push(json!({
+                                            "id": -1,
+                                            "title": title,
+                                            "description": format!("https://shikimori.one/animes/{}", anime_id),
+                                            "cover_image": cover_image,
+                                            "status_text": desc,
+                                            "watch_status": status_key
+                                        }));
+                                    }
+                                }
+                            }
+                            let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                callback_id,
+                                success: true,
+                                data: json!(results),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                                callback_id,
+                                success: false,
+                                data: json!(e.to_string()),
+                            });
+                        }
+                    }
+                });
+            }
+            "search_all" => {
+                let query = envelope.payload.clone();
+                let provider_manager: Arc<dyn crate::services::ProviderManager> = shaku::HasComponent::resolve(&*container);
+                let proxy_clone = proxy.clone();
+                let callback_id = envelope.callback_id.clone();
+                
+                let config = crate::services::config::load_config();
+                let proxy_url = config.proxy_url;
+                
+                tokio::spawn(async move {
+                    let mut results = Vec::new();
+                    
+                    // 1. AnimeGO
+                    if let Ok(res) = provider_manager.search(&query, "animego", &proxy_url).await {
+                        for item in res {
+                            results.push(json!({
+                                "id": -1,
+                                "title": item.title,
+                                "description": item.id.clone(),
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "AnimeGO"
+                            }));
+                        }
+                    }
+                    
+                    // 2. Jut.su
+                    if let Ok(res) = provider_manager.search(&query, "jutsu", &proxy_url).await {
+                        for item in res {
+                            results.push(json!({
+                                "id": -1,
+                                "title": item.title,
+                                "description": item.id.clone(),
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "Jut.su"
+                            }));
+                        }
+                    }
+                    
+                    // 3. AnimeVost
+                    if let Ok(res) = provider_manager.search(&query, "animevost", &proxy_url).await {
+                        for item in res {
+                            let (numeric_id, description) = if item.id.starts_with("http") {
+                                (-1i32, item.id.clone())
+                            } else {
+                                (item.id.parse::<i32>().unwrap_or(-1), item.description.unwrap_or_default())
+                            };
+                            results.push(json!({
+                                "id": numeric_id,
+                                "title": item.title,
+                                "description": if description.is_empty() { item.id.clone() } else { description },
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "AnimeVost"
+                            }));
+                        }
+                    }
+                    
+                    // 4. AniLiberty
+                    if let Ok(res) = provider_manager.search(&query, "aniliberty", &proxy_url).await {
+                        for item in res {
+                            results.push(json!({
+                                "id": -1,
+                                "title": item.title,
+                                "description": item.id.clone(),
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "AniLiberty"
+                            }));
+                        }
+                    }
+
+                    let _ = proxy_clone.send_event(UserEvent::IpcResult {
+                        callback_id,
+                        success: true,
+                        data: json!(results),
+                    });
                 });
             }
             _ => {}

@@ -26,4 +26,5 @@ message StreamRequest {
 message StreamResponse {
   string stream_url = 1;
   string title = 2;
+  string cover_image = 3;
 }

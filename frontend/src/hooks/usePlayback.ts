@@ -14,6 +14,7 @@ export function usePlayback(
     duration: 0,
     paused: true,
     volume: 80,
+    demuxer_cache_duration: 0,
   });
 
   const [seekingValue, setSeekingValue] = useState<number | null>(null);

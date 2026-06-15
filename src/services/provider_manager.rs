@@ -2,7 +2,7 @@ use shaku::{Component, Interface};
 use crate::error::AppError;
 use std::sync::Arc;
 use super::{ProviderAnimeInfo, ProviderSearchResult};
-use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService};
+use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService, AniLibertyService};
 
 #[async_trait::async_trait]
 pub trait ProviderManager: Interface + Send + Sync {
@@ -23,6 +23,8 @@ pub struct ProviderManagerImpl {
     animego: Arc<dyn AnimegoService>,
     #[shaku(inject)]
     shikimori: Arc<dyn ShikimoriService>,
+    #[shaku(inject)]
+    aniliberty: Arc<dyn AniLibertyService>,
 }
 
 #[async_trait::async_trait]
@@ -32,6 +34,7 @@ impl ProviderManager for ProviderManagerImpl {
             || self.jutsu.can_handle(identifier)
             || self.animego.can_handle(identifier)
             || self.shikimori.can_handle(identifier)
+            || self.aniliberty.can_handle(identifier)
     }
 
     async fn get_anime_info(&self, identifier: &str, proxy_url: &str) -> Result<ProviderAnimeInfo, AppError> {
@@ -41,6 +44,8 @@ impl ProviderManager for ProviderManagerImpl {
             self.animego.get_anime_info(identifier, proxy_url).await
         } else if self.shikimori.can_handle(identifier) {
             self.shikimori.get_anime_info(identifier, proxy_url).await
+        } else if self.aniliberty.can_handle(identifier) {
+            self.aniliberty.get_anime_info(identifier, proxy_url).await
         } else if self.animevost.can_handle(identifier) {
             self.animevost.get_anime_info(identifier, proxy_url).await
         } else {
@@ -66,6 +71,10 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.shikimori.search(query, proxy_url).await {
                 results.extend(res);
             }
+        } else if provider.eq_ignore_ascii_case("aniliberty") {
+            if let Ok(res) = self.aniliberty.search(query, proxy_url).await {
+                results.extend(res);
+            }
         } else {
             // all providers
             if let Ok(res) = self.animevost.search(query, proxy_url).await {
@@ -80,6 +89,9 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.shikimori.search(query, proxy_url).await {
                 results.extend(res);
             }
+            if let Ok(res) = self.aniliberty.search(query, proxy_url).await {
+                results.extend(res);
+            }
         }
         Ok(results)
     }
@@ -89,6 +101,8 @@ impl ProviderManager for ProviderManagerImpl {
             self.jutsu.resolve_stream_url(stream_url, proxy_url).await
         } else if self.animego.can_handle(stream_url) {
             self.animego.resolve_stream_url(stream_url, proxy_url).await
+        } else if self.aniliberty.can_handle(stream_url) {
+            self.aniliberty.resolve_stream_url(stream_url, proxy_url).await
         } else if self.animevost.can_handle(stream_url) {
             self.animevost.resolve_stream_url(stream_url, proxy_url).await
         } else {

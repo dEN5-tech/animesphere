@@ -7,6 +7,9 @@ pub mod animego;
 pub mod shikimori;
 pub mod provider_manager;
 pub mod discord_presence;
+pub mod headless;
+pub mod aniliberty;
+pub mod thumbnail_generator;
 
 use shaku::Interface;
 use crate::error::AppError;
@@ -48,11 +51,25 @@ pub trait ContentProvider: Send + Sync {
 
 
 #[derive(Debug, Clone, serde::Serialize)]
+pub struct NerdStats {
+    pub video_codec: String,
+    pub audio_codec: String,
+    pub width: i64,
+    pub height: i64,
+    pub fps: f64,
+    pub hwdec: String,
+    pub video_bitrate: f64,
+    pub frame_drop_count: i64,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
 pub struct PlaybackState {
     pub time_pos: f64,
     pub duration: f64,
     pub paused: bool,
     pub volume: f64,
+    pub demuxer_cache_duration: f64,
+    pub nerd_stats: Option<NerdStats>,
 }
 
 #[derive(Debug, Clone)]
@@ -87,6 +104,14 @@ pub enum MpvCommand {
     SetVolume(f64),
     SetAnime4K(Anime4KMode),
     ClearShaders,
+}
+
+#[async_trait::async_trait]
+pub trait HeadlessService: Interface + Send + Sync {
+    fn set_proxy(&self, proxy: tao::event_loop::EventLoopProxy<crate::window::UserEvent>);
+    async fn navigate(&self, url: &str) -> Result<(), AppError>;
+    async fn eval(&self, script: &str) -> Result<serde_json::Value, AppError>;
+    fn resolve_callback(&self, callback_id: &str, success: bool, data: serde_json::Value);
 }
 
 #[async_trait::async_trait]
@@ -133,6 +158,21 @@ pub trait JutsuService: ContentProvider + Interface + Send + Sync {
 pub trait AnimegoService: ContentProvider + Interface + Send + Sync {}
 
 #[async_trait::async_trait]
-pub trait ShikimoriService: ContentProvider + Interface + Send + Sync {}
+pub trait ShikimoriService: ContentProvider + Interface + Send + Sync {
+    fn get_auth_url(&self, client_id: &str) -> String;
+    async fn start_auth_flow(&self) -> Result<(), AppError>;
+    async fn refresh_access_token(&self) -> Result<(), AppError>;
+    async fn get_user_profile(&self) -> Result<serde_json::Value, AppError>;
+    async fn get_user_bookmarks(&self, limit: i32) -> Result<serde_json::Value, AppError>;
+}
+
+#[async_trait::async_trait]
+pub trait AniLibertyService: ContentProvider + Interface + Send + Sync {}
 
 pub use provider_manager::ProviderManager;
+
+#[async_trait::async_trait]
+pub trait ThumbnailService: Interface + Send + Sync {
+    async fn load_video(&self, url: String) -> Result<(), AppError>;
+    async fn get_thumbnail(&self, time: f64) -> Result<String, AppError>;
+}

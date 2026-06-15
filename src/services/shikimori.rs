@@ -39,7 +39,235 @@ fn extract_shikimori_id(url: &str) -> String {
 }
 
 #[async_trait::async_trait]
-impl ShikimoriService for ShikimoriServiceImpl {}
+impl ShikimoriService for ShikimoriServiceImpl {
+    fn get_auth_url(&self, client_id: &str) -> String {
+        format!(
+            "{}/oauth/authorize?client_id={}&redirect_uri=http%3A%2F%2F127.0.0.1%3A50052%2F&response_type=code&scope=user_rates",
+            SHIKIMORI_BASE,
+            client_id
+        )
+    }
+
+    async fn start_auth_flow(&self) -> Result<(), AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_client_id.trim().is_empty() || config.shikimori_client_secret.trim().is_empty() {
+            return Err(AppError::Mpv("Пожалуйста, сначала укажите Client ID и Client Secret в настройках.".to_string()));
+        }
+
+        let auth_url = self.get_auth_url(&config.shikimori_client_id);
+
+        // Bind listener on 50052
+        let listener = std::net::TcpListener::bind("127.0.0.1:50052")
+            .map_err(|e| AppError::Mpv(format!("Не удалось запустить локальный сервер на порту 50052: {}", e)))?;
+
+        // Launch browser
+        let _ = open::that(&auth_url);
+
+        let mut auth_code = None;
+        if let Ok((mut stream, _)) = listener.accept() {
+            let mut buffer = [0; 2048];
+            use std::io::Read;
+            if let Ok(size) = stream.read(&mut buffer) {
+                let request_str = String::from_utf8_lossy(&buffer[..size]);
+                if let Some(code_idx) = request_str.find("code=") {
+                    let after_code = &request_str[code_idx + 5..];
+                    let code = after_code.split(|c: char| c.is_whitespace() || c == '&').next().unwrap_or("");
+                    auth_code = Some(code.to_string());
+                }
+            }
+
+            use std::io::Write;
+            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
+                <html><body style='font-family: sans-serif; background: #09090b; color: #f4f4f5; text-align: center; padding: 50px;'>\
+                <h1 style='color: #8b5cf6;'>AnimeSphere</h1>\
+                <p>Авторизация в Shikimori успешно завершена! Вы можете закрыть эту вкладку.</p>\
+                </body></html>";
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+        }
+
+        let Some(code) = auth_code else {
+            return Err(AppError::Mpv("Не удалось получить код авторизации из браузера.".to_string()));
+        };
+
+        // Exchange code for tokens
+        let client = build_client(&config.proxy_url)?;
+        let params = [
+            ("grant_type", "authorization_code"),
+            ("client_id", &config.shikimori_client_id),
+            ("client_secret", &config.shikimori_client_secret),
+            ("code", &code),
+            ("redirect_uri", "http://127.0.0.1:50052/"),
+        ];
+
+        let res = client.post("https://shikimori.one/oauth/token")
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| AppError::Mpv(format!("Запрос обмена токена завершился ошибкой: {}", e)))?;
+
+        if !res.status().is_success() {
+            let err_txt = res.text().await.unwrap_or_default();
+            return Err(AppError::Mpv(format!("Ошибка Shikimori при обмене токена: {}", err_txt)));
+        }
+
+        let token_json: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Не удалось распарсить JSON токена: {}", e)))?;
+
+        let access_token = token_json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let refresh_token = token_json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+        if access_token.is_empty() {
+            return Err(AppError::Mpv("Получен пустой access_token от Shikimori.".to_string()));
+        }
+
+        let mut new_config = config.clone();
+        new_config.shikimori_access_token = access_token;
+        new_config.shikimori_refresh_token = refresh_token;
+        crate::services::config::save_config(&new_config)
+            .map_err(|e| AppError::Mpv(format!("Не удалось сохранить конфигурацию: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn refresh_access_token(&self) -> Result<(), AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_refresh_token.trim().is_empty() {
+            return Err(AppError::Mpv("Отсутствует refresh token. Необходим повторный вход.".to_string()));
+        }
+
+        let client = build_client(&config.proxy_url)?;
+        let params = [
+            ("grant_type", "refresh_token"),
+            ("client_id", &config.shikimori_client_id),
+            ("client_secret", &config.shikimori_client_secret),
+            ("refresh_token", &config.shikimori_refresh_token),
+        ];
+
+        let res = client.post("https://shikimori.one/oauth/token")
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .form(&params)
+            .send()
+            .await
+            .map_err(|e| AppError::Mpv(format!("Запрос обновления токена завершился ошибкой: {}", e)))?;
+
+        if !res.status().is_success() {
+            return Err(AppError::Mpv(format!("Ошибка Shikimori при обновлении токена: HTTP {}", res.status())));
+        }
+
+        let token_json: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Не удалось распарсить JSON токена: {}", e)))?;
+
+        let access_token = token_json.get("access_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+        let refresh_token = token_json.get("refresh_token").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+        if access_token.is_empty() {
+            return Err(AppError::Mpv("Получен пустой access_token от Shikimori при обновлении.".to_string()));
+        }
+
+        let mut new_config = config.clone();
+        new_config.shikimori_access_token = access_token;
+        if !refresh_token.is_empty() {
+            new_config.shikimori_refresh_token = refresh_token;
+        }
+        crate::services::config::save_config(&new_config)
+            .map_err(|e| AppError::Mpv(format!("Не удалось сохранить конфигурацию: {}", e)))?;
+
+        Ok(())
+    }
+
+    async fn get_user_profile(&self) -> Result<serde_json::Value, AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_access_token.trim().is_empty() {
+            return Err(AppError::Mpv("No access token found".to_string()));
+        }
+
+        let client = build_client(&config.proxy_url)?;
+        
+        let fetch_profile = |token: &str| {
+            let client = client.clone();
+            let token = token.to_string();
+            async move {
+                client.get("https://shikimori.one/api/users/whoami")
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", token))
+                    .send()
+                    .await
+            }
+        };
+
+        let mut res = fetch_profile(&config.shikimori_access_token).await
+            .map_err(|e| AppError::Mpv(format!("whoami request failed: {}", e)))?;
+
+        // Handle token expiration / 401 Unauthorized
+        if res.status().as_u16() == 401 {
+            println!("Shikimori returned 401. Attempting to refresh access token...");
+            if self.refresh_access_token().await.is_ok() {
+                let fresh_config = crate::services::config::load_config();
+                res = fetch_profile(&fresh_config.shikimori_access_token).await
+                    .map_err(|e| AppError::Mpv(format!("whoami retry request failed: {}", e)))?;
+            }
+        }
+
+        if !res.status().is_success() {
+            return Err(AppError::Mpv(format!("whoami returned HTTP {}", res.status())));
+        }
+
+        let profile: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Parse whoami JSON failed: {}", e)))?;
+        Ok(profile)
+    }
+
+    async fn get_user_bookmarks(&self, limit: i32) -> Result<serde_json::Value, AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_access_token.trim().is_empty() {
+            return Err(AppError::Mpv("No access token found".to_string()));
+        }
+
+        // Fetch user profile first to retrieve user ID
+        let profile = self.get_user_profile().await?;
+        let user_id = profile.get("id").and_then(|v| v.as_i64())
+            .ok_or_else(|| AppError::Mpv("Failed to get user ID from profile".to_string()))?;
+
+        let client = build_client(&config.proxy_url)?;
+        let url = format!("https://shikimori.one/api/users/{}/anime_rates?limit={}", user_id, limit);
+
+        let fetch_bookmarks = |token: &str| {
+            let client = client.clone();
+            let url = url.clone();
+            let token = token.to_string();
+            async move {
+                client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", token))
+                    .send()
+                    .await
+            }
+        };
+
+        let mut res = fetch_bookmarks(&config.shikimori_access_token).await
+            .map_err(|e| AppError::Mpv(format!("anime_rates request failed: {}", e)))?;
+
+        // Handle token expiration / 401 Unauthorized
+        if res.status().as_u16() == 401 {
+            println!("Shikimori returned 401 for bookmarks. Attempting token refresh...");
+            if self.refresh_access_token().await.is_ok() {
+                let fresh_config = crate::services::config::load_config();
+                res = fetch_bookmarks(&fresh_config.shikimori_access_token).await
+                    .map_err(|e| AppError::Mpv(format!("anime_rates retry request failed: {}", e)))?;
+            }
+        }
+
+        if !res.status().is_success() {
+            return Err(AppError::Mpv(format!("anime_rates returned HTTP {}", res.status())));
+        }
+
+        let bookmarks: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Parse anime_rates JSON failed: {}", e)))?;
+        Ok(bookmarks)
+    }
+}
 
 #[async_trait::async_trait]
 impl ContentProvider for ShikimoriServiceImpl {

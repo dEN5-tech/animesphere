@@ -60,7 +60,8 @@ export function callNative<T>(action: string, payload: string = ""): Promise<T> 
                 time_pos: mockTimePos,
                 duration: 1200,
                 paused: mockPaused,
-                volume: mockVolume
+                volume: mockVolume,
+                demuxer_cache_duration: Math.min(60, 1200 - mockTimePos)
               });
             }
           }, 1000);
@@ -111,6 +112,71 @@ export function callNative<T>(action: string, payload: string = ""): Promise<T> 
         ] as unknown as T);
       } else if (action === "select_anime") {
         resolve({ success: true } as unknown as T);
+      } else if (action === "get_thumbnail") {
+        resolve({ thumbnail: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAKAAAABaCAYAAAAAI913AAAAMklEQVR42u3BAQ0AAADCoPdPbQ43oAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA8GY4QAAB65E5XgAAAABJRU5ErkJggg==" } as unknown as T);
+      } else if (action === "shikimori_login") {
+        setTimeout(() => {
+          (window as any).mockShikimoriAuthorized = true;
+          resolve({ success: true } as unknown as T);
+        }, 1500);
+      } else if (action === "shikimori_status") {
+        const isAuth = !!(window as any).mockShikimoriAuthorized;
+        resolve({
+          authorized: isAuth,
+          profile: isAuth ? {
+            nickname: "ShikimoriUser",
+            avatar: "https://shikimori.one/system/users/x160/206253.jpg",
+            url: "https://shikimori.one/users/ShikimoriUser"
+          } : null
+        } as unknown as T);
+      } else if (action === "shikimori_bookmarks") {
+        resolve([
+          {
+            id: -1,
+            title: "Волчица и пряности",
+            description: "https://shikimori.one/animes/z20-ookami-to-koushinryou",
+            cover_image: "http://media.animetop.info/img/2147423374.jpg",
+            status_text: "Статус: Смотрю, серий: 4, оценка: 9/10",
+            watch_status: "watching"
+          },
+          {
+            id: -1,
+            title: "Наруто: Ураганные хроники",
+            description: "https://shikimori.one/animes/z20-naruto-shippuuden",
+            cover_image: "http://media.animetop.info/img/1458104562.jpg",
+            status_text: "Статус: В планах",
+            watch_status: "planned"
+          }
+        ] as unknown as T);
+      } else if (action === "open_browser") {
+        console.log("Mock open browser:", payload);
+        resolve({ success: true } as unknown as T);
+      } else if (action === "search_all") {
+        setTimeout(() => {
+          resolve([
+            {
+              id: -1,
+              title: "Волчица и пряности [AnimeGO]",
+              description: "https://animego.org/anime/volchica-i-pryanosti-i41",
+              cover_image: "http://media.animetop.info/img/2147423374.jpg",
+              provider: "AnimeGO"
+            },
+            {
+              id: -1,
+              title: "Волчица и пряности (Jut.su)",
+              description: "https://jut.su/ookami-to-koshinryou/",
+              cover_image: "http://media.animetop.info/img/924786115.jpg",
+              provider: "Jut.su"
+            },
+            {
+              id: 2938,
+              title: "Волчица и пряности 1 серия (AnimeVost)",
+              description: "2938",
+              cover_image: "http://media.animetop.info/img/1458104562.jpg",
+              provider: "AnimeVost"
+            }
+          ] as unknown as T);
+        }, 800);
       } else {
         resolve(undefined as unknown as T);
       }

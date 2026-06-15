@@ -21,6 +21,7 @@ prost = "0.13"
 
 # Native Multimedia Playback (MPV bindings)
 libmpv2 = "6.0.0"
+libmpv2-sys = "4.0.1"
 
 # Structuring & Parsing
 async-trait = "0.1"
@@ -32,6 +33,11 @@ scraper = "0.27.0"
 html-escape = "0.2"
 raw-window-handle = "0.6"
 discord-rich-presence = "1.1"
+uuid = { version = "1.10", features = ["v4"] }
+dashmap = "6.1"
+parking_lot = "0.12"
+base64 = "0.22.1"
+open = "5.3"
 
 [build-dependencies]
 tonic-build = "0.12"

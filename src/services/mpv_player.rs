@@ -4,7 +4,7 @@ use shaku::Component;
 use tokio::sync::mpsc;
 
 use crate::error::AppError;
-use super::{MpvCommand, MpvService, PlaybackEvent, PlaybackState};
+use super::{MpvCommand, MpvService, PlaybackEvent, PlaybackState, NerdStats};
 
 #[derive(Clone)]
 pub struct MpvPlayerChannels {
@@ -46,7 +46,13 @@ impl MpvPlayerServiceImpl {
                     });
 
                     match mpv_builder {
-                        Ok(instance) => instance,
+                        Ok(instance) => {
+                            let min_level = std::ffi::CString::new("info").unwrap();
+                            let _ = unsafe {
+                                libmpv2_sys::mpv_request_log_messages(instance.ctx.as_ptr(), min_level.as_ptr())
+                            };
+                            instance
+                        },
                         Err(_) => return, // Fail silently inside the isolated thread
                     }
                 }
@@ -55,6 +61,16 @@ impl MpvPlayerServiceImpl {
 
             // Process actor channel controls once initialized
             loop {
+                // Process events (including logs)
+                while let Some(event) = mpv.wait_event(0.0) {
+                    match event {
+                        Ok(libmpv2::events::Event::LogMessage { prefix, level, text, .. }) => {
+                            println!("[MPV LOG] [{}] {}: {}", level, prefix, text.trim());
+                        }
+                        _ => {}
+                    }
+                }
+
                 // Process all pending commands
                 while let Ok(cmd) = cmd_rx.try_recv() {
                     match cmd {
@@ -62,6 +78,12 @@ impl MpvPlayerServiceImpl {
                             let _ = mpv.set_property("wid", new_wid);
                         }
                         MpvCommand::LoadVideo(url) => {
+                            let config = crate::services::config::load_config();
+                            if !config.proxy_url.trim().is_empty() {
+                                let _ = mpv.set_property("http-proxy", config.proxy_url.as_str());
+                            } else {
+                                let _ = mpv.set_property("http-proxy", "");
+                            }
                             let _ = mpv.command("loadfile", &[&url]);
                         }
                         MpvCommand::Play => {
@@ -98,12 +120,34 @@ impl MpvPlayerServiceImpl {
                 let duration = mpv.get_property::<f64>("duration").unwrap_or(0.0);
                 let paused = mpv.get_property::<bool>("pause").unwrap_or(true);
                 let volume = mpv.get_property::<f64>("volume").unwrap_or(0.0);
+                let demuxer_cache_duration = mpv.get_property::<f64>("demuxer-cache-duration").unwrap_or(0.0);
+
+                // Technical stats for nerds
+                let video_codec = mpv.get_property::<String>("video-codec").unwrap_or_else(|_| "unknown".to_string());
+                let audio_codec = mpv.get_property::<String>("audio-codec").unwrap_or_else(|_| "unknown".to_string());
+                let width = mpv.get_property::<i64>("width").unwrap_or(0);
+                let height = mpv.get_property::<i64>("height").unwrap_or(0);
+                let fps = mpv.get_property::<f64>("estimated-vf-fps").unwrap_or(0.0);
+                let hwdec = mpv.get_property::<String>("hwdec-current").unwrap_or_else(|_| "no".to_string());
+                let video_bitrate = mpv.get_property::<f64>("video-bitrate").unwrap_or(0.0);
+                let frame_drop_count = mpv.get_property::<i64>("decoder-frame-drop-count").unwrap_or(0);
 
                 let state = PlaybackState {
                     time_pos,
                     duration,
                     paused,
                     volume,
+                    demuxer_cache_duration,
+                    nerd_stats: Some(NerdStats {
+                        video_codec,
+                        audio_codec,
+                        width,
+                        height,
+                        fps,
+                        hwdec,
+                        video_bitrate,
+                        frame_drop_count,
+                    }),
                 };
                 let _ = state_tx_clone.send(PlaybackEvent::StateUpdate(state));
 

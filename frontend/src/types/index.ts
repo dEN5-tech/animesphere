@@ -16,11 +16,24 @@ export interface StreamInfo {
   title: string;
 }
 
+export interface NerdStats {
+  video_codec: string;
+  audio_codec: string;
+  width: number;
+  height: number;
+  fps: number;
+  hwdec: string;
+  video_bitrate: number;
+  frame_drop_count: number;
+}
+
 export interface PlaybackState {
   time_pos: number;
   duration: number;
   paused: boolean;
   volume: number;
+  demuxer_cache_duration: number;
+  nerd_stats?: NerdStats;
 }
 
 export type Anime4KModeType = 'off' | 'A' | 'B' | 'C';

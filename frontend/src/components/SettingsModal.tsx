@@ -11,6 +11,13 @@ interface SettingsModalProps {
   setDiscordPresenceEnabled: (val: boolean) => void;
   discordClientId: string;
   setDiscordClientId: (val: string) => void;
+  shikimoriClientId: string;
+  setShikimoriClientId: (val: string) => void;
+  shikimoriClientSecret: string;
+  setShikimoriClientSecret: (val: string) => void;
+  shikimoriAuthorized: boolean;
+  shikimoriLoggingIn: boolean;
+  loginShikimori: () => void;
   vostId: string;
   setVostId: (val: string) => void;
   importing: boolean;
@@ -21,6 +28,8 @@ interface SettingsModalProps {
 export function SettingsModal({
   showSettings, setShowSettings, proxyUrl, setProxyUrl, searchProvider, setSearchProvider,
   discordPresenceEnabled, setDiscordPresenceEnabled, discordClientId, setDiscordClientId,
+  shikimoriClientId, setShikimoriClientId, shikimoriClientSecret, setShikimoriClientSecret,
+  shikimoriAuthorized, shikimoriLoggingIn, loginShikimori,
   vostId, setVostId, importing, importPlaylist, saveConfig
 }: SettingsModalProps) {
   if (!showSettings) return null;
@@ -67,6 +76,7 @@ export function SettingsModal({
               <option value="jutsu">Jut.su (Поиск по slug/URL)</option>
               <option value="animego">AnimeGO (Поиск аниме + плеер Aniboom/CVH)</option>
               <option value="shikimori">Shikimori (Метаданные / Обнаружение аниме)</option>
+              <option value="aniliberty">AniLiberty (Поиск по API / aniliberty.top)</option>
             </select>
             <p className="text-[10px] text-muted-foreground">Какой сервис использовать для поиска на главном экране</p>
           </div>
@@ -93,13 +103,58 @@ export function SettingsModal({
             </div>
           </div>
 
+          <div className="space-y-2 pt-4 border-t border-border">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Интеграция Shikimori</label>
+            <div className="space-y-1.5">
+              <input
+                type="text"
+                className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-white placeholder-white/30"
+                placeholder="Client ID"
+                value={shikimoriClientId}
+                onInput={(e: any) => setShikimoriClientId(e.target.value)}
+              />
+              <input
+                type="password"
+                className="w-full bg-background border border-input rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-white placeholder-white/30"
+                placeholder="Client Secret"
+                value={shikimoriClientSecret}
+                onInput={(e: any) => setShikimoriClientSecret(e.target.value)}
+              />
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <span className="text-[10px] text-muted-foreground">
+                Статус:{" "}
+                {shikimoriAuthorized ? (
+                  <span className="text-green-400 font-semibold">Авторизован</span>
+                ) : (
+                  <span className="text-red-400 font-semibold">Не авторизован</span>
+                )}
+              </span>
+              <button
+                type="button"
+                className="bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-3 py-1 text-xs font-semibold transition-colors shadow disabled:opacity-50 inline-flex items-center gap-1.5"
+                onClick={loginShikimori}
+                disabled={shikimoriLoggingIn || !shikimoriClientId || !shikimoriClientSecret}
+              >
+                {shikimoriLoggingIn ? (
+                  <>
+                    <RefreshCw className="h-3 w-3 animate-spin" />
+                    Вход...
+                  </>
+                ) : (
+                  "Войти"
+                )}
+              </button>
+            </div>
+          </div>
+
           <div className="space-y-1.5 pt-4 border-t border-border">
-            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Импорт с AnimeVost / Jut.su</label>
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Импорт с AnimeVost / Jut.su / AniLiberty</label>
             <div className="flex gap-2">
               <input
                 type="text"
                 className="flex-grow bg-background border border-input rounded-lg px-3.5 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-white placeholder-white/30"
-                placeholder="Введите ID новости или URL с jut.su..."
+                placeholder="ID новости, URL с jut.su или alias с aniliberty..."
                 value={vostId}
                 onInput={(e: any) => setVostId(e.target.value)}
                 disabled={importing}

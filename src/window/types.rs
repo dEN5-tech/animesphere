@@ -11,6 +11,19 @@ pub enum UserEvent {
         callback_id: String,
         fullscreen: bool,
     },
+    // Background WebView Events
+    BackgroundNavigate {
+        url: String,
+    },
+    BackgroundExecuteScript {
+        script: String,
+        callback_id: String,
+    },
+    BackgroundIpcResult {
+        callback_id: String,
+        success: bool,
+        data: serde_json::Value,
+    },
 }
 
 #[derive(Deserialize)]

@@ -170,6 +170,7 @@ impl AnimeService for AnimeServiceImpl {
             Ok(Response::new(StreamResponse {
                 stream_url: found.stream_url.clone(),
                 title: found.title.clone(),
+                cover_image: found.cover_image.clone(),
             }))
         } else {
             Err(Status::not_found("Anime not found in database"))

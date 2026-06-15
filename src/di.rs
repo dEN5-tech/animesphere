@@ -7,6 +7,10 @@ use crate::services::animego::AnimegoServiceImpl;
 use crate::services::shikimori::ShikimoriServiceImpl;
 use crate::services::provider_manager::ProviderManagerImpl;
 use crate::services::discord_presence::DiscordPresenceServiceImpl;
+use crate::services::headless::HeadlessServiceImpl;
+
+use crate::services::aniliberty::AniLibertyServiceImpl;
+use crate::services::thumbnail_generator::ThumbnailServiceImpl;
 
 module! {
     pub AppModule {
@@ -18,7 +22,10 @@ module! {
             AnimegoServiceImpl,
             ShikimoriServiceImpl,
             ProviderManagerImpl,
-            DiscordPresenceServiceImpl
+            DiscordPresenceServiceImpl,
+            HeadlessServiceImpl,
+            AniLibertyServiceImpl,
+            ThumbnailServiceImpl
         ],
         providers = []
     }

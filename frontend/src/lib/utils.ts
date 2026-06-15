@@ -1,6 +1,12 @@
 export const getProxiedImageUrl = (url: string) => {
   if (!url) return "";
-  if (url.includes("media.animetop.info") || url.includes("media.animevost.org")) {
+  if (
+    url.includes("media.animetop.info") ||
+    url.includes("media.animevost.org") ||
+    url.includes("shikimori.one") ||
+    url.includes("shikimori.me") ||
+    url.includes("shikimori")
+  ) {
     const isWindowsOrAndroid = /windows|android/i.test(navigator.userAgent);
     const isHttps = url.startsWith("https");
     const proto = isHttps ? "https" : "http";

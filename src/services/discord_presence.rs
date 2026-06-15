@@ -102,15 +102,8 @@ impl DiscordPresenceServiceImpl {
         }
 
         if state.client.is_none() {
-            match DiscordIpcClient::new(client_id.as_str()) {
-                Ok(client) => {
-                    state.client = Some(client);
-                }
-                Err(err) => {
-                    eprintln!("[DiscordPresence] Failed to create IPC client: {err}");
-                    return;
-                }
-            }
+            let client = DiscordIpcClient::new(client_id.as_str());
+            state.client = Some(client);
         }
 
         let Some(client) = state.client.as_mut() else {
@@ -160,31 +153,34 @@ impl DiscordPresenceServiceImpl {
         
         let base_url = "https://raw.githubusercontent.com/dEN5-tech/animesphere/main/assets";
         
+        let large_image_url: String;
         // Use external cover URL if available, otherwise fallback to brand icon URL
         if let Some(url) = state.active_cover_url.as_deref() {
-            assets = assets.large_image(url);
+            large_image_url = url.to_string();
         } else {
-            assets = assets.large_image(&format!("{}/icon_512.png", base_url));
+            large_image_url = format!("{}/icon_512.png", base_url);
         }
-        assets = assets.large_text(title.as_str());
+        assets = assets.large_image(&large_image_url);
+        assets = assets.large_text(&title);
 
+        let small_image_url: String;
+        let small_text: String;
         // Add small status icon based on playback/anime4k state using external URLs
         if state.paused {
-            assets = assets
-                .small_image(&format!("{}/discord_paused.png", base_url))
-                .small_text("Paused");
-        } else if state.anime4k_label.is_some() {
-            assets = assets
-                .small_image(&format!("{}/discord_anime4k.png", base_url))
-                .small_text(state.anime4k_label.as_ref().unwrap().as_str());
+            small_image_url = format!("{}/discord_paused.png", base_url);
+            small_text = "Paused".to_string();
+        } else if let Some(label) = state.anime4k_label.as_ref() {
+            small_image_url = format!("{}/discord_anime4k.png", base_url);
+            small_text = label.clone();
         } else {
-            assets = assets
-                .small_image(&format!("{}/discord_playing.png", base_url))
-                .small_text("Playing");
+            small_image_url = format!("{}/discord_playing.png", base_url);
+            small_text = "Playing".to_string();
         }
+        
+        assets = assets.small_image(&small_image_url).small_text(&small_text);
 
         let activity = activity::Activity::new()
-            .details(title)
+            .details(&title)
             .state(state_text)
             .assets(assets);
 

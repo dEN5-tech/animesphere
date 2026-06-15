@@ -63,6 +63,31 @@ impl DesktopApp {
         let mpv_service: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*self.container);
         mpv_service.send_command(MpvCommand::AttachWindow(wid))?;
 
+        // 1. Create invisible window for background headless webview
+        let bg_window = WindowBuilder::new()
+            .with_visible(false)
+            .build(&event_loop)
+            .map_err(|e| AppError::WindowCreation(e.to_string()))?;
+
+        // 2. Initialize HeadlessService proxy
+        let headless: Arc<dyn crate::services::HeadlessService> = shaku::HasComponent::resolve(&*self.container);
+        headless.set_proxy(proxy.clone());
+
+        let proxy_bg = proxy.clone();
+        let bg_webview = WebViewBuilder::new()
+            .with_ipc_handler(move |msg| {
+                if let Ok(envelope) = serde_json::from_str::<crate::window::types::IpcEnvelope>(msg.body()) {
+                    let data = serde_json::from_str(&envelope.payload).unwrap_or_else(|_| serde_json::Value::String(envelope.payload));
+                    let _ = proxy_bg.send_event(UserEvent::BackgroundIpcResult {
+                        callback_id: envelope.callback_id,
+                        success: true,
+                        data,
+                    });
+                }
+            })
+            .build(&bg_window)
+            .map_err(|e| AppError::WebviewCreation(e.to_string()))?;
+
         let mut playback_rx = mpv_service.subscribe();
         let proxy_clone = proxy.clone();
         self.tokio_runtime.spawn(async move {
@@ -82,6 +107,9 @@ impl DesktopApp {
 
         let tokio_proto = tokio_ref.clone();
 
+        let ipc_container = container_ref.clone();
+        let ipc_tokio = tokio_ref.clone();
+
         let webview = WebViewBuilder::new()
             .with_transparent(true)
             .with_html(html_layout)
@@ -90,9 +118,9 @@ impl DesktopApp {
             })
             .with_ipc_handler(move |msg| {
                 let body = msg.body().to_string();
-                let thread_container = container_ref.clone();
+                let thread_container = ipc_container.clone();
                 let thread_proxy = proxy.clone();
-                let tokio_spawn = tokio_ref.clone();
+                let tokio_spawn = ipc_tokio.clone();
 
                 tokio_spawn.spawn(async move {
                     super::ipc::handle_ipc(body, thread_container, thread_proxy).await;
@@ -125,6 +153,39 @@ impl DesktopApp {
                     window.set_fullscreen(fullscreen_opt);
                     let js_eval = format!("window.resolveIpc('{}', true, {});", callback_id, fullscreen);
                     let _ = webview.evaluate_script(&js_eval);
+                }
+                // Background WebView Handlers
+                tao::event::Event::UserEvent(UserEvent::BackgroundNavigate { url }) => {
+                    let _ = bg_webview.load_url(&url);
+                }
+                tao::event::Event::UserEvent(UserEvent::BackgroundExecuteScript { script, callback_id }) => {
+                    // Inject a helper to post results back through the background IPC
+                    let wrapped_script = format!(
+                        r#"
+                        (async () => {{
+                            try {{
+                                const result = await (async () => {{ {} }})();
+                                window.ipc.postMessage(JSON.stringify({{
+                                    callback_id: '{}',
+                                    action: 'result',
+                                    payload: JSON.stringify(result)
+                                }}));
+                            }} catch (e) {{
+                                window.ipc.postMessage(JSON.stringify({{
+                                    callback_id: '{}',
+                                    action: 'error',
+                                    payload: JSON.stringify(e.toString())
+                                }}));
+                            }}
+                        }})();
+                        "#,
+                        script, callback_id, callback_id
+                    );
+                    let _ = bg_webview.evaluate_script(&wrapped_script);
+                }
+                tao::event::Event::UserEvent(UserEvent::BackgroundIpcResult { callback_id, success, data }) => {
+                    let headless: Arc<dyn crate::services::HeadlessService> = shaku::HasComponent::resolve(&*container_ref);
+                    headless.resolve_callback(&callback_id, success, data);
                 }
                 tao::event::Event::WindowEvent {
                     event: tao::event::WindowEvent::CloseRequested,
