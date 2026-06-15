@@ -43,14 +43,19 @@ jobs:
         export PROTOC=/usr/bin/protoc
         cargo build --release
 
-    - name: Rename binary for release
-      run: mv target/release/animesphere target/release/animesphere-linux-x86_64
+    - name: Package Linux Release Archive
+      run: |
+        mkdir -p dist_linux
+        cp target/release/animesphere dist_linux/
+        cp -r shaders dist_linux/
+        cd dist_linux
+        zip -r ../animesphere-linux-x86_64.zip *
 
     - name: Upload Linux Binary Artifact
       uses: actions/upload-artifact@v4
       with:
         name: animesphere-linux
-        path: target/release/animesphere-linux-x86_64
+        path: animesphere-linux-x86_64.zip
 
   build-macos:
     name: Build macOS Client
@@ -86,14 +91,19 @@ jobs:
       run: |
         cargo build --release
 
-    - name: Rename binary for release
-      run: mv target/release/animesphere target/release/animesphere-macos-x86_64
+    - name: Package macOS Release Archive
+      run: |
+        mkdir -p dist_macos
+        cp target/release/animesphere dist_macos/
+        cp -r shaders dist_macos/
+        cd dist_macos
+        zip -r ../animesphere-macos-x86_64.zip *
 
     - name: Upload macOS Binary Artifact
       uses: actions/upload-artifact@v4
       with:
         name: animesphere-macos
-        path: target/release/animesphere-macos-x86_64
+        path: animesphere-macos-x86_64.zip
 
   publish:
     name: Create GitHub Release
@@ -120,7 +130,7 @@ jobs:
       uses: softprops/action-gh-release@v2
       with:
         files: |
-          ./artifacts/animesphere-linux-x86_64
-          ./artifacts/animesphere-macos-x86_64
+          ./artifacts/animesphere-linux-x86_64.zip
+          ./artifacts/animesphere-macos-x86_64.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
