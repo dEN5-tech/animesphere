@@ -50,7 +50,7 @@ impl DiscordPresenceServiceImpl {
 
         let client_id = env_client_id.or(config_client_id).or_else(|| {
             // Default AnimeSphere Client ID fallback
-            Some("1251640242253893693".to_string())
+            Some("925843819302379581".to_string())
         });
 
         let env_enabled = std::env::var("ANIMESPHERE_DISCORD_PRESENCE_ENABLED")
@@ -158,21 +158,29 @@ impl DiscordPresenceServiceImpl {
 
         let mut assets = activity::Assets::new();
         
-        // Use external cover URL if available, otherwise fallback to static asset key
+        let base_url = "https://raw.githubusercontent.com/dEN5-tech/animesphere/main/assets";
+        
+        // Use external cover URL if available, otherwise fallback to brand icon URL
         if let Some(url) = state.active_cover_url.as_deref() {
             assets = assets.large_image(url);
         } else {
-            assets = assets.large_image("large_icon");
+            assets = assets.large_image(&format!("{}/icon_512.png", base_url));
         }
         assets = assets.large_text(title.as_str());
 
-        // Add small status icon based on playback/anime4k state
+        // Add small status icon based on playback/anime4k state using external URLs
         if state.paused {
-            assets = assets.small_image("state_paused").small_text("Paused");
+            assets = assets
+                .small_image(&format!("{}/discord_paused.png", base_url))
+                .small_text("Paused");
         } else if state.anime4k_label.is_some() {
-            assets = assets.small_image("state_anime4k").small_text(state.anime4k_label.as_ref().unwrap().as_str());
+            assets = assets
+                .small_image(&format!("{}/discord_anime4k.png", base_url))
+                .small_text(state.anime4k_label.as_ref().unwrap().as_str());
         } else {
-            assets = assets.small_image("state_playing").small_text("Playing");
+            assets = assets
+                .small_image(&format!("{}/discord_playing.png", base_url))
+                .small_text("Playing");
         }
 
         let activity = activity::Activity::new()
