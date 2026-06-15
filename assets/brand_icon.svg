@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="sphereGrad" x1="512" y1="128" x2="512" y2="896" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#B58CFF"/>
+      <stop offset="0.48" stop-color="#6F52E5"/>
+      <stop offset="1" stop-color="#2A1C75"/>
+    </linearGradient>
+    <filter id="glow" x="0" y="0" width="1024" height="1024" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feGaussianBlur stdDeviation="40" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  
+  <!-- Background Glow -->
+  <circle cx="512" cy="512" r="400" fill="#6F52E5" fill-opacity="0.15" filter="url(#glow)"/>
+  
+  <!-- Main Sphere -->
+  <circle cx="512" cy="512" r="384" fill="url(#sphereGrad)"/>
+  
+  <!-- Inner Highlight -->
+  <circle cx="580" cy="440" r="100" fill="white" fill-opacity="0.12"/>
+  
+  <!-- Play Button Triangle -->
+  <path d="M420 380V644L660 512L420 380Z" fill="white" fill-opacity="0.95"/>
+</svg>
