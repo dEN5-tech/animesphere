@@ -97,13 +97,13 @@ jobs:
         cp target/release/animesphere dist_macos/
         cp -r shaders dist_macos/
         cd dist_macos
-        zip -r ../animesphere-macos-x86_64.zip *
+        zip -r ../animesphere-macos-arm64.zip *
 
     - name: Upload macOS Binary Artifact
       uses: actions/upload-artifact@v4
       with:
         name: animesphere-macos
-        path: animesphere-macos-x86_64.zip
+        path: animesphere-macos-arm64.zip
 
   publish:
     name: Create GitHub Release
@@ -131,6 +131,6 @@ jobs:
       with:
         files: |
           ./artifacts/animesphere-linux-x86_64.zip
-          ./artifacts/animesphere-macos-x86_64.zip
+          ./artifacts/animesphere-macos-arm64.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
