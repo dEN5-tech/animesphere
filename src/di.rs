@@ -11,6 +11,7 @@ use crate::services::headless::HeadlessServiceImpl;
 
 use crate::services::aniliberty::AniLibertyServiceImpl;
 use crate::services::thumbnail_generator::ThumbnailServiceImpl;
+use crate::services::collaps::{CollapsServiceImpl, CollapsDashServiceImpl};
 
 module! {
     pub AppModule {
@@ -25,7 +26,9 @@ module! {
             DiscordPresenceServiceImpl,
             HeadlessServiceImpl,
             AniLibertyServiceImpl,
-            ThumbnailServiceImpl
+            ThumbnailServiceImpl,
+            CollapsServiceImpl,
+            CollapsDashServiceImpl
         ],
         providers = []
     }

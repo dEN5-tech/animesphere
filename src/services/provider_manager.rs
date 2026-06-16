@@ -2,7 +2,7 @@ use shaku::{Component, Interface};
 use crate::error::AppError;
 use std::sync::Arc;
 use super::{ProviderAnimeInfo, ProviderSearchResult};
-use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService, AniLibertyService};
+use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService, AniLibertyService, CollapsService, CollapsDashService};
 
 #[async_trait::async_trait]
 pub trait ProviderManager: Interface + Send + Sync {
@@ -25,6 +25,10 @@ pub struct ProviderManagerImpl {
     shikimori: Arc<dyn ShikimoriService>,
     #[shaku(inject)]
     aniliberty: Arc<dyn AniLibertyService>,
+    #[shaku(inject)]
+    collaps: Arc<dyn CollapsService>,
+    #[shaku(inject)]
+    collaps_dash: Arc<dyn CollapsDashService>,
 }
 
 #[async_trait::async_trait]
@@ -35,6 +39,8 @@ impl ProviderManager for ProviderManagerImpl {
             || self.animego.can_handle(identifier)
             || self.shikimori.can_handle(identifier)
             || self.aniliberty.can_handle(identifier)
+            || self.collaps.can_handle(identifier)
+            || self.collaps_dash.can_handle(identifier)
     }
 
     async fn get_anime_info(&self, identifier: &str, proxy_url: &str) -> Result<ProviderAnimeInfo, AppError> {
@@ -48,6 +54,10 @@ impl ProviderManager for ProviderManagerImpl {
             self.aniliberty.get_anime_info(identifier, proxy_url).await
         } else if self.animevost.can_handle(identifier) {
             self.animevost.get_anime_info(identifier, proxy_url).await
+        } else if self.collaps.can_handle(identifier) {
+            self.collaps.get_anime_info(identifier, proxy_url).await
+        } else if self.collaps_dash.can_handle(identifier) {
+            self.collaps_dash.get_anime_info(identifier, proxy_url).await
         } else {
             Err(AppError::Mpv(format!("No provider can handle identifier: {}", identifier)))
         }
@@ -75,6 +85,14 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.aniliberty.search(query, proxy_url).await {
                 results.extend(res);
             }
+        } else if provider.eq_ignore_ascii_case("collaps") {
+            if let Ok(res) = self.collaps.search(query, proxy_url).await {
+                results.extend(res);
+            }
+        } else if provider.eq_ignore_ascii_case("collaps-dash") {
+            if let Ok(res) = self.collaps_dash.search(query, proxy_url).await {
+                results.extend(res);
+            }
         } else {
             // all providers
             if let Ok(res) = self.animevost.search(query, proxy_url).await {
@@ -92,6 +110,12 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.aniliberty.search(query, proxy_url).await {
                 results.extend(res);
             }
+            if let Ok(res) = self.collaps.search(query, proxy_url).await {
+                results.extend(res);
+            }
+            if let Ok(res) = self.collaps_dash.search(query, proxy_url).await {
+                results.extend(res);
+            }
         }
         Ok(results)
     }
@@ -105,6 +129,10 @@ impl ProviderManager for ProviderManagerImpl {
             self.aniliberty.resolve_stream_url(stream_url, proxy_url).await
         } else if self.animevost.can_handle(stream_url) {
             self.animevost.resolve_stream_url(stream_url, proxy_url).await
+        } else if self.collaps.can_handle(stream_url) {
+            self.collaps.resolve_stream_url(stream_url, proxy_url).await
+        } else if self.collaps_dash.can_handle(stream_url) {
+            self.collaps_dash.resolve_stream_url(stream_url, proxy_url).await
         } else {
             // Fallback — return as-is (handles shikimori:// and direct URLs)
             Ok(stream_url.to_string())

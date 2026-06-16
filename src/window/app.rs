@@ -188,6 +188,13 @@ impl DesktopApp {
                     headless.resolve_callback(&callback_id, success, data);
                 }
                 tao::event::Event::WindowEvent {
+                    event: tao::event::WindowEvent::Resized(_),
+                    ..
+                } => {
+                    let mpv_service: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container_ref);
+                    let _ = mpv_service.send_command(MpvCommand::AttachWindow(wid));
+                }
+                tao::event::Event::WindowEvent {
                     event: tao::event::WindowEvent::CloseRequested,
                     ..
                 } => {

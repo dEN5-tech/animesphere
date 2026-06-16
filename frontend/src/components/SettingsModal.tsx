@@ -77,6 +77,8 @@ export function SettingsModal({
               <option value="animego">AnimeGO (Поиск аниме + плеер Aniboom/CVH)</option>
               <option value="shikimori">Shikimori (Метаданные / Обнаружение аниме)</option>
               <option value="aniliberty">AniLiberty (Поиск по API / aniliberty.top)</option>
+              <option value="collaps">Collaps (Поиск по API / HLS ~720p)</option>
+              <option value="collaps-dash">Collaps-DASH (Поиск по API / DASH ~1080p)</option>
             </select>
             <p className="text-[10px] text-muted-foreground">Какой сервис использовать для поиска на главном экране</p>
           </div>

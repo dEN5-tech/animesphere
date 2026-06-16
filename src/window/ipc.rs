@@ -266,7 +266,7 @@ pub async fn handle_ipc(
                             let json_titles: Vec<serde_json::Value> = titles.into_iter().map(|item| {
                                 // For URL-based providers (AnimeGO), id is a URL string
                                 // We store the URL in description so select_anime can use it as identifier
-                                let (numeric_id, description) = if item.id.starts_with("http") {
+                                let (numeric_id, description) = if item.id.starts_with("http") || item.id.starts_with("collaps") {
                                     (-1i32, item.id.clone())
                                 } else {
                                     (item.id.parse::<i32>().unwrap_or(-1), item.description.unwrap_or_default())
@@ -407,6 +407,24 @@ pub async fn handle_ipc(
             "clear_shaders" => {
                 let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
                 let _ = mpv.send_command(MpvCommand::ClearShaders);
+                let _ = proxy.send_event(UserEvent::IpcResult {
+                    callback_id: envelope.callback_id,
+                    success: true,
+                    data: json!({ "success": true }),
+                });
+            }
+            "cycle_audio" => {
+                let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                let _ = mpv.send_command(MpvCommand::CycleAudio);
+                let _ = proxy.send_event(UserEvent::IpcResult {
+                    callback_id: envelope.callback_id,
+                    success: true,
+                    data: json!({ "success": true }),
+                });
+            }
+            "cycle_subtitles" => {
+                let mpv: Arc<dyn MpvService> = shaku::HasComponent::resolve(&*container);
+                let _ = mpv.send_command(MpvCommand::CycleSubtitles);
                 let _ = proxy.send_event(UserEvent::IpcResult {
                     callback_id: envelope.callback_id,
                     success: true,
@@ -662,6 +680,32 @@ pub async fn handle_ipc(
                                 "description": item.id.clone(),
                                 "cover_image": item.cover_image.unwrap_or_default(),
                                 "provider": "AniLiberty"
+                            }));
+                        }
+                    }
+
+                    // 5. Collaps
+                    if let Ok(res) = provider_manager.search(&query, "collaps", &proxy_url).await {
+                        for item in res {
+                            results.push(json!({
+                                "id": -1,
+                                "title": item.title,
+                                "description": item.id.clone(),
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "Collaps"
+                            }));
+                        }
+                    }
+
+                    // 6. Collaps-DASH
+                    if let Ok(res) = provider_manager.search(&query, "collaps-dash", &proxy_url).await {
+                        for item in res {
+                            results.push(json!({
+                                "id": -1,
+                                "title": item.title,
+                                "description": item.id.clone(),
+                                "cover_image": item.cover_image.unwrap_or_default(),
+                                "provider": "Collaps-DASH"
                             }));
                         }
                     }

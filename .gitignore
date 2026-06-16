@@ -10,3 +10,6 @@
 
 # Exclude large binaries that exceed GitHub's 100MB file limit
 /bin/mpv-sdk/libmpv-2.dll
+
+# Lampac reference codebase (local only, has its own git repo)
+/Lampac

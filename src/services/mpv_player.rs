@@ -79,12 +79,64 @@ impl MpvPlayerServiceImpl {
                         }
                         MpvCommand::LoadVideo(url) => {
                             let config = crate::services::config::load_config();
-                            if !config.proxy_url.trim().is_empty() {
-                                let _ = mpv.set_property("http-proxy", config.proxy_url.as_str());
-                            } else {
-                                let _ = mpv.set_property("http-proxy", "");
+                            
+                            // Extract subtitles from URL if present
+                            let mut play_url = url.clone();
+                            let mut subs_to_add = Vec::new();
+                            if let Some(pos) = url.find("#subtitles=") {
+                                play_url = url[..pos].to_string();
+                                let subs_part = &url[pos + 11..];
+                                for sub_entry in subs_part.split(';') {
+                                    if let Some(pipe_pos) = sub_entry.find('|') {
+                                        let sub_name = sub_entry[..pipe_pos].to_string();
+                                        let sub_url = sub_entry[pipe_pos + 1..].to_string();
+                                        if !sub_name.is_empty() && !sub_url.is_empty() {
+                                            subs_to_add.push((sub_name, sub_url));
+                                        }
+                                    }
+                                }
                             }
-                            let _ = mpv.command("loadfile", &[&url]);
+
+                            let is_collaps = play_url.contains("collaps") || play_url.contains("interkh.com") || play_url.contains("luxembd.ws");
+                            
+                            // Video playback CDNs (Russian providers and aggregators) should bypass proxy
+                            let bypass_proxy = is_collaps
+                                || play_url.contains("libria.fun")
+                                || play_url.contains("anilibria")
+                                || play_url.contains("aniliberty")
+                                || play_url.contains("animetop")
+                                || play_url.contains("animevost")
+                                || play_url.contains("jut.su")
+                                || play_url.contains("aniboom")
+                                || play_url.contains("sibnet")
+                                || play_url.contains("secvideo");
+
+                            if bypass_proxy {
+                                println!("[MPV] Bypassing proxy for stream URL: {}", play_url);
+                                let _ = mpv.set_property("http-proxy", "");
+                            } else {
+                                if !config.proxy_url.trim().is_empty() {
+                                    let _ = mpv.set_property("http-proxy", config.proxy_url.as_str());
+                                } else {
+                                    let _ = mpv.set_property("http-proxy", "");
+                                }
+                            }
+
+                            if is_collaps {
+                                println!("[MPV] Setting browser headers for Collaps stream.");
+                                let _ = mpv.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+                                let _ = mpv.set_property("http-header-fields", "Origin: https://kinokrad.my,Referer: https://kinokrad.my/");
+                            } else {
+                                let _ = mpv.set_property("user-agent", "");
+                                let _ = mpv.set_property("http-header-fields", "");
+                            }
+                            let _ = mpv.command("loadfile", &[&play_url]);
+
+                            // Load external subtitles
+                            for (name, sub_url) in subs_to_add {
+                                println!("[MPV] Adding external subtitle track '{}': {}", name, sub_url);
+                                let _ = mpv.command("sub-add", &[&sub_url, "auto", &name]);
+                            }
                         }
                         MpvCommand::Play => {
                             let _ = mpv.set_property("pause", false);
@@ -111,6 +163,12 @@ impl MpvPlayerServiceImpl {
                         }
                         MpvCommand::ClearShaders => {
                             let _ = mpv.command("change-list", &["glsl-shaders", "clr", ""]);
+                        }
+                        MpvCommand::CycleAudio => {
+                            let _ = mpv.command("cycle", &["aid"]);
+                        }
+                        MpvCommand::CycleSubtitles => {
+                            let _ = mpv.command("cycle", &["sid"]);
                         }
                     }
                 }

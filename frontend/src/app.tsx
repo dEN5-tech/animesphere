@@ -52,6 +52,7 @@ export function App() {
   const [currentTab, setCurrentTab] = useState<'home' | 'search' | 'history' | 'bookmarks'>('home');
   const [shikimoriBookmarks, setShikimoriBookmarks] = useState<any[]>([]);
   const [isLoadingBookmarks, setIsLoadingBookmarks] = useState(false);
+  const [activeBookmarkFilter, setActiveBookmarkFilter] = useState<string>('all');
 
   // ─── Resume Playback State ────────────────────────────────────────────────
   const [resumeData, setResumeData] = useState<any | null>(null);
@@ -599,6 +600,9 @@ export function App() {
               >
                 <Bookmark className="h-5 w-5 shrink-0" />
                 <span className="hidden md:inline text-sm">Закладки</span>
+                <span className="hidden md:inline-flex items-center justify-center px-1.5 py-0.5 ml-auto text-[8px] font-extrabold tracking-wide uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
+                  Фильтры
+                </span>
               </button>
             )}
           </aside>
@@ -762,9 +766,9 @@ export function App() {
                   <h3 className="text-lg font-bold text-white">Недавно просмотренные</h3>
                   {titles && titles.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
-                      {titles.slice(0, 3).map(title => (
+                      {titles.slice(0, 3).map((title, idx) => (
                         <div
-                          key={title.id}
+                          key={`${title.description || title.id}-${idx}`}
                           className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
                           onClick={() => onSelectTitle(title)}
                         >
@@ -823,6 +827,8 @@ export function App() {
                         searchProvider === "jutsu" ? "Поиск аниме на Jut.su (транслитом, например: ookami-to-koshinryou)..."
                         : searchProvider === "animego" ? "Поиск аниме на AnimeGO (например: Bleach: Thousand-Year Blood War)..."
                         : searchProvider === "shikimori" ? "Поиск аниме на Shikimori (например: Naruto, Bleach)..."
+                        : searchProvider === "collaps" ? "Поиск аниме на Collaps (например: Naruto, Bleach)..."
+                        : searchProvider === "collaps-dash" ? "Поиск аниме на Collaps-DASH (например: Naruto, Bleach)..."
                         : "Поиск аниме на AnimeVost..."
                       }
                       value={searchQuery}
@@ -851,9 +857,9 @@ export function App() {
                   </div>
                 ) : titles && titles.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {titles.map(title => (
+                    {titles.map((title, idx) => (
                       <div
-                        key={title.id}
+                        key={`${title.description || title.id}-${idx}`}
                         className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
                         onClick={() => onSelectTitle(title)}
                       >
@@ -915,9 +921,9 @@ export function App() {
                 </div>
                 {titles && titles.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {titles.map(title => (
+                    {titles.map((title, idx) => (
                       <div
-                        key={title.id}
+                        key={`${title.description || title.id}-${idx}`}
                         className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
                         onClick={() => onSelectTitle(title)}
                       >
@@ -969,7 +975,14 @@ export function App() {
             {currentTab === 'bookmarks' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-white">Мой список Shikimori</h3>
+                  <div className="flex items-center gap-3">
+                    <h3 className="text-xl font-bold text-white">Мой список Shikimori</h3>
+                    {shikimoriBookmarks && shikimoriBookmarks.length > 0 && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                        Фильтры активны
+                      </span>
+                    )}
+                  </div>
                   <button
                     onClick={loadBookmarks}
                     className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
@@ -979,61 +992,118 @@ export function App() {
                   </button>
                 </div>
 
+                {/* Filters pills container */}
+                {shikimoriBookmarks && shikimoriBookmarks.length > 0 && (
+                  <div className="flex flex-wrap gap-2 pb-1">
+                    {[
+                      { key: 'all', label: 'Все' },
+                      { key: 'watching', label: 'Смотрю' },
+                      { key: 'planned', label: 'В планах' },
+                      { key: 'completed', label: 'Просмотрено' },
+                      { key: 'on_hold', label: 'Отложено' },
+                      { key: 'dropped', label: 'Брошено' },
+                      { key: 'rewatching', label: 'Пересматриваю' },
+                    ].map(filter => {
+                      const count = filter.key === 'all'
+                        ? shikimoriBookmarks.length
+                        : shikimoriBookmarks.filter(b => b.watch_status === filter.key).length;
+
+                      // Only render filters that have items, or the 'All' filter
+                      if (filter.key !== 'all' && count === 0) return null;
+
+                      const isActive = activeBookmarkFilter === filter.key;
+                      return (
+                        <button
+                          key={filter.key}
+                          onClick={() => setActiveBookmarkFilter(filter.key)}
+                          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                            isActive
+                              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/25'
+                              : 'bg-zinc-800/40 text-white/60 hover:text-white border border-white/5 hover:bg-zinc-800/60'
+                          }`}
+                        >
+                          {filter.label}
+                          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold ${
+                            isActive ? 'bg-white/25 text-white' : 'bg-white/5 text-white/40'
+                          }`}>
+                            {count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
                 {isLoadingBookmarks ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
                     <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
                     <p className="text-sm text-white/50">Загружаем ваш список из Shikimori...</p>
                   </div>
                 ) : shikimoriBookmarks && shikimoriBookmarks.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                    {shikimoriBookmarks.map((title, idx) => (
-                      <div
-                        key={idx}
-                        className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col relative"
-                        onClick={() => onSelectTitle(title)}
-                      >
-                        {/* Bookmark progress status badge */}
-                        <div className="absolute top-2.5 right-2.5 z-20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border bg-zinc-950/85 backdrop-blur shadow-md text-violet-300 border-violet-500/20">
-                          {title.status_text ? title.status_text.split("Статус: ")[1].split(",")[0] : ""}
+                  (() => {
+                    const filtered = shikimoriBookmarks.filter(title => {
+                      if (activeBookmarkFilter === 'all') return true;
+                      return title.watch_status === activeBookmarkFilter;
+                    });
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-20 text-white/30 text-sm border border-white/5 rounded-2xl bg-zinc-900/10">
+                          Нет закладок с выбранным статусом.
                         </div>
-
-                        <div
-                          className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
-                          style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
-                        >
-                          <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                          <div className="relative z-10 w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
-                            {isMetadataTitle(title) ? (
-                              <Search className="h-5 w-5" />
-                            ) : (
-                              <Play className="h-5 w-5 fill-current ml-0.5" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="p-4 flex-grow flex flex-col justify-between">
-                          <div>
-                            <h3 className="font-bold text-base mb-1 text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{title.status_text || title.description}</p>
-                          </div>
-                          {isMetadataTitle(title) && (
-                            <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                              <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">Shikimori</span>
-                              <button 
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  triggerAltSearch(title.title);
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-xs font-bold transition-all duration-200"
-                              >
-                                <Search className="h-3.5 w-3.5" />
-                                Найти видео
-                              </button>
+                      );
+                    }
+                    return (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        {filtered.map((title, idx) => (
+                          <div
+                            key={idx}
+                            className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col relative"
+                            onClick={() => onSelectTitle(title)}
+                          >
+                            {/* Bookmark progress status badge */}
+                            <div className="absolute top-2.5 right-2.5 z-20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border bg-zinc-950/85 backdrop-blur shadow-md text-violet-300 border-violet-500/20">
+                              {title.status_text ? title.status_text.split("Статус: ")[1].split(",")[0] : ""}
                             </div>
-                          )}
-                        </div>
+
+                            <div
+                              className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
+                              style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
+                            >
+                              <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
+                                {isMetadataTitle(title) ? (
+                                  <Search className="h-5 w-5" />
+                                ) : (
+                                  <Play className="h-5 w-5 fill-current ml-0.5" />
+                                )}
+                              </div>
+                            </div>
+                            <div className="p-4 flex-grow flex flex-col justify-between">
+                              <div>
+                                <h3 className="font-bold text-base mb-1 text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h3>
+                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{title.status_text || title.description}</p>
+                              </div>
+                              {isMetadataTitle(title) && (
+                                <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
+                                  <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">Shikimori</span>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      triggerAltSearch(title.title);
+                                    }}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-xs font-bold transition-all duration-200"
+                                  >
+                                    <Search className="h-3.5 w-3.5" />
+                                    Найти видео
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })()
                 ) : (
                   <div className="text-center py-20 text-white/30 text-sm">
                     Ваш список на Shikimori пуст или не удалось загрузить данные.
@@ -1093,7 +1163,7 @@ export function App() {
                   {isLoadingAltSearch ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-3">
                       <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-sm text-white/40">Опрашиваем AnimeGO, Jut.su, AnimeVost, AniLiberty...</p>
+                      <p className="text-sm text-white/40">Опрашиваем AnimeGO, Jut.su, AnimeVost, AniLiberty, Collaps...</p>
                     </div>
                   ) : altSearchResults && altSearchResults.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

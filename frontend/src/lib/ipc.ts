@@ -107,8 +107,14 @@ export function callNative<T>(action: string, payload: string = ""): Promise<T> 
           { id: 2938, title: "Власть книжного червя: Приёмная дочь лорда", description: "Ascendance of a Bookworm: Part III", cover_image: "http://media.animetop.info/img/2147423374.jpg" }
         ] as unknown as T);
       } else if (action === "search_animevost") {
+        const desc = mockSearchProvider === "collaps" ? "collaps://movie/2938"
+                   : mockSearchProvider === "collaps-dash" ? "collaps-dash://movie/2938"
+                   : mockSearchProvider === "aniliberty" ? "https://aniliberty.top/release/naruto"
+                   : mockSearchProvider === "jutsu" ? "https://jut.su/naruto"
+                   : mockSearchProvider === "animego" ? "https://animego.org/anime/naruto"
+                   : "По запросу: " + payload;
         resolve([
-          { id: 2938, title: "Власть книжного червя: Приёмная дочь лорда", description: "По запросу: " + payload, cover_image: "http://media.animetop.info/img/2147423374.jpg" }
+          { id: mockSearchProvider.startsWith("collaps") ? -1 : 2938, title: "Власть книжного червя: Приёмная дочь лорда", description: desc, cover_image: "http://media.animetop.info/img/2147423374.jpg" }
         ] as unknown as T);
       } else if (action === "select_anime") {
         resolve({ success: true } as unknown as T);

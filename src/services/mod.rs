@@ -10,6 +10,7 @@ pub mod discord_presence;
 pub mod headless;
 pub mod aniliberty;
 pub mod thumbnail_generator;
+pub mod collaps;
 
 use shaku::Interface;
 use crate::error::AppError;
@@ -104,6 +105,8 @@ pub enum MpvCommand {
     SetVolume(f64),
     SetAnime4K(Anime4KMode),
     ClearShaders,
+    CycleAudio,
+    CycleSubtitles,
 }
 
 #[async_trait::async_trait]
@@ -168,6 +171,12 @@ pub trait ShikimoriService: ContentProvider + Interface + Send + Sync {
 
 #[async_trait::async_trait]
 pub trait AniLibertyService: ContentProvider + Interface + Send + Sync {}
+
+#[async_trait::async_trait]
+pub trait CollapsService: ContentProvider + Interface + Send + Sync {}
+
+#[async_trait::async_trait]
+pub trait CollapsDashService: ContentProvider + Interface + Send + Sync {}
 
 pub use provider_manager::ProviderManager;
 
