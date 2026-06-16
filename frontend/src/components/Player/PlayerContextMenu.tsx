@@ -21,40 +21,40 @@ export function PlayerContextMenu({ x, y, onClose, onToggleNerdStats }: PlayerCo
 
   return (
     <div 
-      className="fixed z-[100] pointer-events-auto w-52 bg-zinc-900/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-1.5 animate-in fade-in zoom-in duration-150"
+      className="fixed z-[100] pointer-events-auto w-52 bg-[#0D0E15]/95 backdrop-blur-2xl border border-[#FF007F]/20 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] overflow-hidden py-1.5 animate-in fade-in zoom-in duration-150"
       style={{ left: x, top: y }}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="px-4 py-2 mb-1 border-b border-white/5">
-        <span className="text-[10px] font-bold uppercase tracking-widest text-white/30">Параметры плеера</span>
+        <span className="text-[10px] font-bold uppercase tracking-widest text-[#8E8E9F]">Параметры плеера</span>
       </div>
       
       <button 
         onClick={() => { onToggleNerdStats(); onClose(); }}
-        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-violet-600/30 transition-all group"
+        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-[#FF007F]/15 transition-all group"
       >
-        <div className="p-1 rounded-md bg-white/5 group-hover:bg-violet-500/20 transition-colors">
-          <Terminal className="h-3.5 w-3.5 text-violet-400" />
+        <div className="p-1 rounded-md bg-white/5 group-hover:bg-[#FF007F]/20 transition-colors">
+          <Terminal className="h-3.5 w-3.5 text-[#FF007F]" />
         </div>
         <span>Системная статистика</span>
       </button>
 
       <button 
         onClick={cycleAudio}
-        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-violet-600/30 transition-all group"
+        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-[#FF007F]/15 transition-all group"
       >
-        <div className="p-1 rounded-md bg-white/5 group-hover:bg-violet-500/20 transition-colors">
-          <Volume2 className="h-3.5 w-3.5 text-violet-400" />
+        <div className="p-1 rounded-md bg-white/5 group-hover:bg-[#FF007F]/20 transition-colors">
+          <Volume2 className="h-3.5 w-3.5 text-[#FF007F]" />
         </div>
         <span>Сменить озвучку</span>
       </button>
 
       <button 
         onClick={cycleSubtitles}
-        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-violet-600/30 transition-all group"
+        className="w-full px-4 py-2.5 flex items-center gap-3 text-xs font-bold text-white/70 hover:text-white hover:bg-[#FF007F]/15 transition-all group"
       >
-        <div className="p-1 rounded-md bg-white/5 group-hover:bg-violet-500/20 transition-colors">
-          <Languages className="h-3.5 w-3.5 text-violet-400" />
+        <div className="p-1 rounded-md bg-white/5 group-hover:bg-[#FF007F]/20 transition-colors">
+          <Languages className="h-3.5 w-3.5 text-[#FF007F]" />
         </div>
         <span>Сменить субтитры</span>
       </button>
@@ -65,7 +65,7 @@ export function PlayerContextMenu({ x, y, onClose, onToggleNerdStats }: PlayerCo
         onClick={onClose}
         className="w-full px-4 py-2 flex items-center gap-3 text-xs font-semibold text-white/40 hover:text-white transition-colors"
       >
-        <XCircle className="h-3.5 w-3.5" />
+        <XCircle className="h-3.5 w-3.5 text-[#8E8E9F]" />
         <span>Закрыть меню</span>
       </button>
     </div>

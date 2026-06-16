@@ -1,38 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    /* ── Deep Dark Base ──────────────────────────── */
+    --base-dark:       8, 8, 16;       /* #080810 */
+    --base-dark-2:     13, 14, 21;     /* #0D0E15 */
+    --card-surface:    22, 22, 34;     /* #161622 */
 
-    --card: 240 10% 6%;
+    /* ── Neon Accents ────────────────────────────── */
+    --neon-pink:       255, 0, 127;    /* #FF007F */
+    --neon-pink-dark:  204, 0,  96;    /* #CC0060 */
+    --neon-cyan:       0,  240, 255;   /* #00F0FF */
+    --neon-cyan-dark:  0,  180, 204;   /* #00B4CC */
+
+    /* ── Muted ───────────────────────────────────── */
+    --muted-text:      142, 142, 159;  /* #8E8E9F */
+
+    /* ── Tailwind CSS vars ───────────────────────── */
+    --background:      240 17% 5%;
+    --foreground:      0 0% 98%;
+    --card:            240 20% 11%;
     --card-foreground: 0 0% 98%;
-
-    --popover: 240 10% 3.9%;
+    --popover:         240 17% 5%;
     --popover-foreground: 0 0% 98%;
-
-    --primary: 263.4 70% 50.4%;
+    --primary:         330 100% 50%;  /* pink */
     --primary-foreground: 210 20% 98%;
-
-    --secondary: 240 3.7% 15.9%;
+    --secondary:       240 20% 13%;
     --secondary-foreground: 0 0% 98%;
-
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
-
-    --accent: 240 3.7% 15.9%;
+    --muted:           240 20% 13%;
+    --muted-foreground: 240 8% 55%;
+    --accent:          240 20% 16%;
     --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62.8% 30.6%;
+    --destructive:     0 62% 30%;
     --destructive-foreground: 0 0% 98%;
-
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83.9%;
-
-    --radius: 0.75rem;
+    --border:          240 15% 14%;
+    --input:           240 15% 14%;
+    --ring:            330 100% 50%;
+    --radius:          0.75rem;
   }
 }
 
@@ -40,32 +48,133 @@
   * {
     @apply border-border;
   }
+
+  html {
+    background-color: rgb(var(--base-dark));
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg,
+      rgb(var(--base-dark)) 0%,
+      rgb(var(--base-dark-2)) 50%,
+      rgb(var(--base-dark)) 100%);
+    min-height: 100vh;
   }
 }
 
-/* Custom player styling that bypasses typical layouts */
-body.playback-active {
-  background-color: transparent !important;
+/* ─────────────────────────────────────────────────────────────────
+   Neon Glow Keyframes
+   ──────────────────────────────────────────────────────────────── */
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
 }
 
-/* Custom Webkit scrollbar for premium theme */
+@keyframes neon-border-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(var(--neon-pink), 0.4); }
+  50%       { box-shadow: 0 0 20px rgba(var(--neon-pink), 0.7); }
+}
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes scanline-sweep {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes scanline-shimmer {
+  0% { opacity: 0.2; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.2; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Utility: Neon Text Gradient
+   ──────────────────────────────────────────────────────────────── */
+.neon-gradient-text {
+  background: linear-gradient(90deg, #FF007F, #00F0FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.neon-glow-pink {
+  box-shadow: 0 0 12px rgba(var(--neon-pink), 0.5),
+              0 0 30px rgba(var(--neon-pink), 0.15);
+}
+
+.neon-glow-cyan {
+  box-shadow: 0 0 12px rgba(var(--neon-cyan), 0.5),
+              0 0 30px rgba(var(--neon-cyan), 0.15);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Utility: Cyberpunk Grid Background
+   ──────────────────────────────────────────────────────────────── */
+.cyber-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 0, 127, 0.035) 1.5px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.cyber-grid::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(8, 8, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 127, 0.02), rgba(0, 240, 255, 0.01), rgba(255, 0, 127, 0.02));
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+  opacity: 0.25;
+  animation: scanline-shimmer 8s infinite ease-in-out;
+  z-index: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Player — clear body background during playback
+   ──────────────────────────────────────────────────────────────── */
+body.playback-active {
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Custom Webkit Scrollbar — neon gradient accent
+   ──────────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
-
 ::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(8, 8, 16, 0.3);
 }
-
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, #FF007F, #00F0FF);
   border-radius: 99px;
 }
-
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: linear-gradient(180deg, #CC0060, #00B4CC);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Range input — neon pink thumb
+   ──────────────────────────────────────────────────────────────── */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #FF007F;
+  box-shadow: 0 0 8px rgba(var(--neon-pink), 0.6);
+  cursor: pointer;
 }

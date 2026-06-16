@@ -346,7 +346,7 @@ export function App() {
     : 0;
 
   return (
-    <div className={activeMedia ? "playback-active" : "w-full max-w-7xl mx-auto px-6 py-10"}>
+    <div className={activeMedia ? "playback-active" : "w-full max-w-7xl mx-auto px-6 py-10 relative z-10"}>
       {activeMedia ? (
         <div 
           className={`fixed inset-0 z-50 flex flex-col justify-between overflow-hidden select-none pointer-events-none transition-all duration-300 ${showControls ? 'opacity-100' : 'opacity-0'}`}
@@ -355,7 +355,7 @@ export function App() {
           <div className={`relative z-10 bg-gradient-to-b from-black/95 to-transparent p-6 flex items-center gap-4 pointer-events-auto transform transition-transform duration-300 ${showControls ? 'translate-y-0' : '-translate-y-full'}`}>
             <button
               onClick={() => { stopAnime(); setShowDrawer(false); }}
-              className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-zinc-900 px-4 py-2 text-sm font-semibold text-white hover:bg-zinc-800 hover:text-white transition-colors pointer-events-auto"
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-[#0D0E15] px-4 py-2 text-sm font-bold text-white hover:bg-[#FF007F] hover:border-[#FF007F] hover:shadow-[0_0_15px_rgba(255,0,127,0.4)] transition-all pointer-events-auto active:scale-95"
             >
               <ArrowLeft className="h-4 w-4" />
               Назад
@@ -400,11 +400,11 @@ export function App() {
                 onMouseLeave={handleTimelineMouseLeave}
               >
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-white/20 z-10 pointer-events-none"
+                  className="absolute left-0 top-0 h-full rounded-full bg-[#00F0FF]/20 z-10 pointer-events-none"
                   style={{ width: `${bufferPercent}%` }}
                 />
                 <div
-                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 z-10 pointer-events-none"
+                  className="absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-[#FF007F] to-[#00F0FF] z-10 pointer-events-none neon-glow-pink"
                   style={{ width: `${progressPercent}%` }}
                 />
                 <input
@@ -422,20 +422,20 @@ export function App() {
                     className="absolute bottom-full mb-3 -translate-x-1/2 flex flex-col items-center pointer-events-none z-30 transition-all duration-100 ease-out"
                     style={{ left: `${hoverX}px` }}
                   >
-                    <div className="relative rounded-lg overflow-hidden border border-violet-500/30 bg-zinc-950/90 shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur w-44 aspect-video flex items-center justify-center">
+                    <div className="relative rounded-xl overflow-hidden border border-[#FF007F]/30 bg-[#080810]/95 shadow-[0_8px_30px_rgba(0,0,0,0.8)] backdrop-blur-md w-44 aspect-video flex items-center justify-center">
                       {thumbnailUrl ? (
                         <img src={thumbnailUrl} className="w-full h-full object-cover" />
                       ) : (
-                        <div className="absolute inset-0 bg-zinc-950/80 flex items-center justify-center">
+                        <div className="absolute inset-0 bg-[#080810]/80 flex items-center justify-center">
                           {isLoadingThumbnail ? (
-                            <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+                            <div className="w-6 h-6 border-2 border-[#FF007F] border-t-transparent rounded-full animate-spin" />
                           ) : (
                             <span className="text-white/40 text-xs font-mono">...</span>
                           )}
                         </div>
                       )}
                     </div>
-                    <div className="mt-1.5 bg-zinc-950/90 border border-violet-500/20 px-2 py-0.5 rounded text-[10px] font-mono text-violet-300 shadow backdrop-blur">
+                    <div className="mt-1.5 bg-[#080810]/95 border border-[#FF007F]/20 px-2 py-0.5 rounded text-[10px] font-mono text-[#00F0FF] shadow backdrop-blur-md">
                       {formatTime(hoverTime)}
                     </div>
                   </div>
@@ -451,7 +451,7 @@ export function App() {
                 <button
                   onClick={playPrev}
                   disabled={currentEpisodeIndex <= 0}
-                  className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center hover:bg-zinc-800 hover:border-white/20 transition-all text-white disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+                  className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 flex items-center justify-center hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 transition-all text-white disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
                   title="Предыдущая серия"
                 >
                   <SkipBack className="h-4 w-4 fill-current" />
@@ -460,7 +460,7 @@ export function App() {
                 {/* Rewind */}
                 <button
                   onClick={() => skipSeconds(-10)}
-                  className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center hover:bg-zinc-800 hover:border-white/20 transition-all text-white pointer-events-auto"
+                  className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 flex items-center justify-center hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 transition-all text-white pointer-events-auto"
                   title="Назад на 10 сек"
                 >
                   <RotateCcw className="h-4 w-4" />
@@ -469,7 +469,7 @@ export function App() {
                 {/* Play/Pause */}
                 <button
                   onClick={togglePlayback}
-                  className="w-12 h-12 rounded-full bg-violet-600 hover:bg-violet-700 text-white flex items-center justify-center transition-all shadow-lg hover:scale-105 pointer-events-auto"
+                  className="w-12 h-12 rounded-full bg-[#FF007F] hover:bg-[#CC0060] text-white flex items-center justify-center transition-all shadow-lg shadow-[#FF007F]/25 hover:scale-110 active:scale-95 pointer-events-auto neon-glow-pink"
                 >
                   {playbackState.paused ? (
                     <Play className="h-5 w-5 fill-current ml-0.5" />
@@ -481,7 +481,7 @@ export function App() {
                 {/* Fast Forward */}
                 <button
                   onClick={() => skipSeconds(10)}
-                  className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center hover:bg-zinc-800 hover:border-white/20 transition-all text-white pointer-events-auto"
+                  className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 flex items-center justify-center hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 transition-all text-white pointer-events-auto"
                   title="Вперед на 10 сек"
                 >
                   <RotateCw className="h-4 w-4" />
@@ -491,7 +491,7 @@ export function App() {
                 <button
                   onClick={playNext}
                   disabled={currentEpisodeIndex === -1 || currentEpisodeIndex >= animeList.length - 1}
-                  className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center hover:bg-zinc-800 hover:border-white/20 transition-all text-white disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
+                  className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 flex items-center justify-center hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 transition-all text-white disabled:opacity-30 disabled:cursor-not-allowed pointer-events-auto"
                   title="Следующая серия"
                 >
                   <SkipForward className="h-4 w-4 fill-current" />
@@ -503,7 +503,7 @@ export function App() {
                 <div className="flex items-center gap-2 group/volume pointer-events-auto">
                   <button
                     onClick={() => handleVolumeChange({ target: { value: playbackState.volume > 0 ? 0 : 80 } })}
-                    className="w-9 h-9 rounded-full bg-zinc-900 hover:bg-zinc-800 flex items-center justify-center text-white"
+                    className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 flex items-center justify-center text-white transition-all"
                   >
                     {playbackState.volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                   </button>
@@ -528,7 +528,7 @@ export function App() {
                 {/* Fullscreen Toggle */}
                 <button
                   onClick={toggleFullscreen}
-                  className="w-9 h-9 rounded-full bg-zinc-900 border border-white/10 flex items-center justify-center text-white hover:bg-zinc-800 hover:border-white/20 transition-all pointer-events-auto"
+                  className="w-9 h-9 rounded-full bg-[#0D0E15] border border-white/10 flex items-center justify-center text-white hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40 active:scale-95 transition-all pointer-events-auto"
                   title={isFullscreen ? "Выйти из полноэкранного режима" : "Полноэкранный режим"}
                 >
                   {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
@@ -537,7 +537,7 @@ export function App() {
                 {/* Drawer Button */}
                 <button
                   onClick={() => setShowDrawer(!showDrawer)}
-                  className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all pointer-events-auto ${showDrawer ? 'bg-violet-600 border-violet-600 text-white' : 'bg-zinc-900 border-white/10 text-white hover:bg-zinc-800 hover:border-white/20'}`}
+                  className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all pointer-events-auto active:scale-95 ${showDrawer ? 'bg-[#FF007F] border-[#FF007F] text-white shadow-lg shadow-[#FF007F]/20' : 'bg-[#0D0E15] border-white/10 text-white hover:bg-[#FF007F]/10 hover:border-[#FF007F]/40'}`}
                   title="Список серий"
                 >
                   <Menu className="h-4 w-4" />
@@ -549,28 +549,28 @@ export function App() {
       ) : (
         <div className="flex gap-6 items-start">
           {/* Vertical Left Sidebar Navigation */}
-          <aside className="w-16 md:w-56 shrink-0 flex flex-col gap-1.5 p-2 bg-zinc-950/40 border border-white/5 rounded-2xl backdrop-blur-xl">
+          <aside className="w-16 md:w-56 shrink-0 flex flex-col gap-1.5 p-2 bg-[#161622]/60 border border-white/10 rounded-2xl backdrop-blur-xl shadow-xl">
             <button
               onClick={() => setCurrentTab('home')}
-              className={`flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 ${
+              className={`group flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 active:scale-95 ${
                 currentTab === 'home'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold shadow-md shadow-violet-600/10'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-[#FF007F] to-[#CC0060] text-white font-bold shadow-lg shadow-[#FF007F]/25'
+                  : 'text-[#8E8E9F] hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#FF007F]'
               }`}
             >
-              <Home className="h-5 w-5 shrink-0" />
+              <Home className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
               <span className="hidden md:inline text-sm">Главная</span>
             </button>
 
             <button
               onClick={() => setCurrentTab('search')}
-              className={`flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 ${
+              className={`group flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 active:scale-95 ${
                 currentTab === 'search'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold shadow-md shadow-violet-600/10'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-[#FF007F] to-[#CC0060] text-white font-bold shadow-lg shadow-[#FF007F]/25'
+                  : 'text-[#8E8E9F] hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#FF007F]'
               }`}
             >
-              <Search className="h-5 w-5 shrink-0" />
+              <Search className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
               <span className="hidden md:inline text-sm">Поиск</span>
             </button>
 
@@ -579,26 +579,26 @@ export function App() {
                 setCurrentTab('history');
                 loadHistory();
               }}
-              className={`flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 ${
+              className={`group flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 active:scale-95 ${
                 currentTab === 'history'
-                  ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold shadow-md shadow-violet-600/10'
-                  : 'text-white/60 hover:text-white hover:bg-white/5'
+                  ? 'bg-gradient-to-r from-[#FF007F] to-[#CC0060] text-white font-bold shadow-lg shadow-[#FF007F]/25'
+                  : 'text-[#8E8E9F] hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#FF007F]'
               }`}
             >
-              <History className="h-5 w-5 shrink-0" />
+              <History className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
               <span className="hidden md:inline text-sm">История</span>
             </button>
 
             {shikimoriAuthorized && (
               <button
                 onClick={() => setCurrentTab('bookmarks')}
-                className={`flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 ${
+                className={`group flex items-center gap-3 w-full px-3.5 py-3 rounded-xl transition-all duration-200 active:scale-95 ${
                   currentTab === 'bookmarks'
-                    ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold shadow-md shadow-violet-600/10'
-                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                    ? 'bg-gradient-to-r from-[#FF007F] to-[#CC0060] text-white font-bold shadow-lg shadow-[#FF007F]/25'
+                    : 'text-[#8E8E9F] hover:text-white hover:bg-white/5 border-l-2 border-transparent hover:border-[#FF007F]'
                 }`}
               >
-                <Bookmark className="h-5 w-5 shrink-0" />
+                <Bookmark className="h-5 w-5 shrink-0 group-hover:scale-110 transition-transform" />
                 <span className="hidden md:inline text-sm">Закладки</span>
                 <span className="hidden md:inline-flex items-center justify-center px-1.5 py-0.5 ml-auto text-[8px] font-extrabold tracking-wide uppercase text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-md">
                   Фильтры
@@ -609,10 +609,10 @@ export function App() {
 
           {/* Right Content Panel */}
           <div className="flex-grow space-y-6">
-            <header className="flex items-center justify-between pb-4 border-b border-white/5">
+            <header className="flex items-center justify-between pb-4 border-b border-white/10">
               <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-extrabold tracking-tight bg-gradient-to-r from-violet-400 to-indigo-400 bg-clip-text text-transparent">AnimeSphere</h1>
-                <span className="inline-flex items-center rounded-full bg-violet-500/10 border border-violet-500/20 px-2.5 py-0.5 text-xs font-semibold text-violet-400">Native MPV Engine</span>
+                <h1 className="text-3xl font-extrabold tracking-tight neon-gradient-text">AnimeSphere</h1>
+                <span className="inline-flex items-center rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/25 px-2.5 py-0.5 text-xs font-semibold text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.1)]">Native MPV Engine</span>
               </div>
               <div className="flex items-center gap-3">
                 {shikimoriAuthorized && shikimoriProfile && (
@@ -622,29 +622,29 @@ export function App() {
                         callNative("open_browser", shikimoriProfile.url).catch(err => console.error(err));
                       }
                     }}
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-violet-500/20 bg-violet-500/5 hover:bg-violet-500/10 transition-all text-xs font-medium text-violet-300 hover:scale-105 active:scale-95 shadow-sm"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#00F0FF]/30 bg-[#00F0FF]/5 hover:bg-[#00F0FF]/15 transition-all text-xs font-medium text-[#00F0FF] hover:scale-105 active:scale-95 shadow-[0_0_15px_rgba(0,240,255,0.15)]"
                     title={`Открыть профиль Shikimori: ${shikimoriProfile.nickname}`}
                   >
                     {shikimoriProfile.avatar ? (
                       <img
                         src={shikimoriProfile.avatar}
                         alt={shikimoriProfile.nickname}
-                        className="w-6 h-6 rounded-full object-cover border border-violet-400/30 shadow-inner"
+                        className="w-6 h-6 rounded-full object-cover border border-[#00F0FF]/30 shadow-inner"
                         onError={(e: any) => {
                           e.currentTarget.style.display = 'none';
                         }}
                       />
                     ) : (
-                      <div className="w-6 h-6 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center text-[10px] font-bold text-violet-400 uppercase shadow-inner">
+                      <div className="w-6 h-6 rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/30 flex items-center justify-center text-[10px] font-bold text-[#00F0FF] uppercase shadow-inner">
                         {shikimoriProfile.nickname.slice(0, 2)}
                       </div>
                     )}
-                    <span className="hidden sm:inline font-semibold">{shikimoriProfile.nickname}</span>
+                    <span className="hidden sm:inline font-bold">{shikimoriProfile.nickname}</span>
                   </button>
                 )}
                 <button
                   onClick={() => setShowSettings(true)}
-                  className="p-2 border border-border rounded-lg bg-card/60 hover:bg-accent text-white transition-all shadow-sm hover:scale-105"
+                  className="p-2 border border-white/10 rounded-lg bg-[#161622]/60 hover:bg-[#FF007F]/10 hover:border-[#FF007F]/50 text-white transition-all shadow-sm hover:scale-105 active:scale-95 hover:shadow-[0_0_15px_rgba(255,0,127,0.25)]"
                   title="Настройки"
                 >
                   <Settings className="h-5 w-5" />
@@ -664,7 +664,7 @@ export function App() {
 
                 {/* ── Resume Banner ── */}
                 {resumeData && !resumeDismissed && (
-                  <div className="relative flex gap-4 p-4 rounded-2xl border border-violet-500/20 bg-gradient-to-r from-violet-950/40 via-zinc-900/60 to-indigo-950/30 backdrop-blur-xl shadow-xl overflow-hidden">
+                  <div className="relative flex gap-4 p-4 rounded-2xl border border-[#FF007F]/20 bg-gradient-to-r from-[#FF007F]/10 via-[#161622]/80 to-[#00F0FF]/10 backdrop-blur-xl shadow-xl shadow-black/45 overflow-hidden">
                     {/* Blurred cover art background */}
                     {resumeData.cover_image && (
                       <div
@@ -680,7 +680,7 @@ export function App() {
                     {/* Info */}
                     <div className="relative flex-grow flex flex-col justify-between min-w-0 py-0.5">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-violet-400 mb-0.5">Продолжить просмотр</p>
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-[#FF007F] mb-0.5 neon-pulse">Продолжить просмотр</p>
                         <h3 className="text-base font-bold text-white line-clamp-1">{resumeData.anime_title}</h3>
                         <p className="text-xs text-white/50 line-clamp-1 mt-0.5">{resumeData.episode_title}</p>
                       </div>
@@ -688,11 +688,11 @@ export function App() {
                         {/* Progress bar */}
                         <div className="flex-grow h-1 rounded-full bg-white/10 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-gradient-to-r from-violet-500 to-indigo-500 transition-all"
+                            className="h-full rounded-full bg-gradient-to-r from-[#FF007F] to-[#00F0FF] transition-all neon-glow-pink"
                             style={{ width: `${Math.min(100, (resumeData.time_pos / 1440) * 100)}%` }}
                           />
                         </div>
-                        <span className="text-[10px] font-mono text-violet-300 shrink-0">
+                        <span className="text-[10px] font-mono text-[#00F0FF] shrink-0">
                           {formatTime(resumeData.time_pos)}
                         </span>
                       </div>
@@ -702,7 +702,7 @@ export function App() {
                       <button
                         onClick={resumePlayback}
                         disabled={importing}
-                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white text-xs font-bold transition-all shadow-lg shadow-violet-600/30 disabled:opacity-50"
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#FF007F] hover:bg-[#CC0060] active:scale-95 text-white text-xs font-bold transition-all shadow-lg shadow-[#FF007F]/30 disabled:opacity-50 hover:scale-105"
                       >
                         <Play className="h-3.5 w-3.5 fill-current" />
                         Продолжить
@@ -713,7 +713,7 @@ export function App() {
                           setResumeData(null);
                           setResumeDismissed(false);
                         }}
-                        className="px-4 py-2 rounded-xl bg-zinc-800/80 hover:bg-zinc-700/80 text-white/60 hover:text-white text-xs font-semibold transition-all"
+                        className="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-white/80 hover:text-white text-xs font-semibold transition-all active:scale-95"
                       >
                         Начать заново
                       </button>
@@ -721,7 +721,7 @@ export function App() {
                     {/* Dismiss X */}
                     <button
                       onClick={() => setResumeDismissed(true)}
-                      className="absolute top-2.5 right-2.5 text-white/30 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+                      className="absolute top-2.5 right-2.5 text-[#8E8E9F] hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
                     >
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -729,24 +729,24 @@ export function App() {
                 )}
                 {/* Resume Playback section if animeList is not empty */}
                 {animeList && animeList.length > 0 ? (
-                  <div className="p-6 rounded-2xl border border-violet-500/10 bg-gradient-to-r from-violet-950/20 via-zinc-900/40 to-indigo-950/10 backdrop-blur flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div className="p-6 rounded-2xl border border-[#FF007F]/15 bg-gradient-to-r from-[#FF007F]/5 via-[#161622]/80 to-[#00F0FF]/5 backdrop-blur-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-lg">
                     <div className="space-y-1">
-                      <p className="text-xs uppercase tracking-widest text-violet-400 font-bold">Активный плейлист</p>
+                      <p className="text-xs uppercase tracking-widest text-[#FF007F] font-bold">Активный плейлист</p>
                       <h2 className="text-xl font-bold text-white line-clamp-1">{animeList[0].title.split(" - ")[0]}</h2>
                       <p className="text-sm text-white/50 font-medium">{animeList.length} серий доступно для воспроизведения</p>
                     </div>
                     <button
                       onClick={() => setShowDrawer(true)}
-                      className="px-6 py-2.5 rounded-full bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold transition-all shadow-lg hover:scale-105 active:scale-95 flex items-center gap-2"
+                      className="px-6 py-2.5 rounded-full bg-[#FF007F] hover:bg-[#CC0060] text-white text-sm font-bold transition-all shadow-lg shadow-[#FF007F]/20 hover:scale-105 active:scale-95 flex items-center gap-2 neon-glow-pink"
                     >
                       <Play className="h-4 w-4 fill-current" />
                       Продолжить просмотр
                     </button>
                   </div>
                 ) : (
-                  <div className="p-10 rounded-2xl border border-white/5 bg-zinc-900/20 backdrop-blur text-center space-y-4">
-                    <div className="w-16 h-16 rounded-2xl bg-zinc-800/40 border border-white/5 flex items-center justify-center mx-auto">
-                      <Play className="h-8 w-8 text-white/40" />
+                  <div className="p-10 rounded-2xl border border-white/10 bg-[#161622]/40 backdrop-blur-xl text-center space-y-4 shadow-lg">
+                    <div className="w-16 h-16 rounded-2xl bg-[#0D0E15] border border-[#FF007F]/25 flex items-center justify-center mx-auto shadow-inner hover:shadow-[0_0_15px_rgba(255,0,127,0.2)] transition-shadow">
+                      <Play className="h-8 w-8 text-[#FF007F]" />
                     </div>
                     <div className="space-y-1">
                       <h3 className="text-lg font-bold text-white">Список серий пуст</h3>
@@ -754,7 +754,7 @@ export function App() {
                     </div>
                     <button
                       onClick={() => setCurrentTab('search')}
-                      className="px-5 py-2 rounded-full border border-violet-500/25 bg-violet-500/10 text-violet-300 text-xs font-semibold hover:bg-violet-500/20 transition-all"
+                      className="px-5 py-2 rounded-full border border-[#FF007F]/30 bg-[#FF007F]/10 text-white text-xs font-bold hover:bg-[#FF007F] hover:text-white hover:shadow-[0_0_15px_rgba(255,0,127,0.3)] transition-all active:scale-95"
                     >
                       Перейти к поиску
                     </button>
@@ -769,15 +769,15 @@ export function App() {
                       {titles.slice(0, 3).map((title, idx) => (
                         <div
                           key={`${title.description || title.id}-${idx}`}
-                          className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
+                          className="group cursor-pointer rounded-xl border border-white/10 bg-[#161622]/60 hover:border-[#FF007F]/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.15)] transition-all duration-300 hover:scale-[1.03] flex flex-col"
                           onClick={() => onSelectTitle(title)}
                         >
                           <div
-                            className="relative h-36 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
+                            className="relative aspect-[2/3] w-full bg-[#0D0E15] border-b border-white/10 flex items-center justify-center bg-cover bg-center rounded-t-xl"
                             style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
                           >
                             <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                            <div className="relative z-10 w-10 h-10 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
+                            <div className="relative z-10 w-12 h-12 rounded-full bg-[#FF007F] text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-[#FF007F]/45 neon-glow-pink">
                               {isMetadataTitle(title) ? (
                                 <Search className="h-4 w-4" />
                               ) : (
@@ -786,17 +786,17 @@ export function App() {
                             </div>
                           </div>
                           <div className="p-3">
-                            <h4 className="font-bold text-sm text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h4>
-                            <p className="text-[10px] text-muted-foreground line-clamp-2 mt-0.5">{title.description}</p>
+                            <h4 className="font-bold text-sm text-white group-hover:text-[#FF007F] transition-colors line-clamp-1">{title.title}</h4>
+                            <p className="text-[10px] text-[#8E8E9F] line-clamp-2 mt-0.5">{title.description}</p>
                             {isMetadataTitle(title) && (
                               <div className="mt-2.5 pt-2.5 border-t border-white/5 flex items-center justify-between">
-                                <span className="text-[9px] text-white/30 font-medium uppercase tracking-wider">Shikimori</span>
+                                <span className="text-[9px] text-[#8E8E9F] font-bold uppercase tracking-wider">Shikimori</span>
                                 <button 
                                   onClick={(e) => {
                                     e.stopPropagation();
                                     triggerAltSearch(title.title);
                                   }}
-                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-[10px] font-bold transition-all duration-200"
+                                  className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#FF007F]/10 hover:bg-[#FF007F] text-[#FF007F] hover:text-white border border-[#FF007F]/25 text-[10px] font-bold hover:shadow-[0_0_10px_rgba(255,0,127,0.35)] transition-all duration-200 active:scale-95"
                                 >
                                   <Search className="h-3 w-3" />
                                   Найти видео
@@ -819,10 +819,10 @@ export function App() {
                 {/* Search input bar */}
                 <div className="relative flex gap-2">
                   <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-[#8E8E9F]" />
                     <input
                       type="text"
-                      className="w-full bg-card/20 border border-border rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-1 focus:ring-ring text-white placeholder-white/40"
+                      className="w-full bg-[#161622]/60 border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#FF007F]/50 focus:border-[#FF007F]/50 text-white placeholder-white/20 transition-all"
                       placeholder={
                         searchProvider === "jutsu" ? "Поиск аниме на Jut.su (транслитом, например: ookami-to-koshinryou)..."
                         : searchProvider === "animego" ? "Поиск аниме на AnimeGO (например: Bleach: Thousand-Year Blood War)..."
@@ -842,7 +842,7 @@ export function App() {
                   </div>
                   <button
                     onClick={handleSearch}
-                    className="bg-violet-600 hover:bg-violet-700 text-white rounded-lg px-5 py-2 text-sm font-semibold transition-colors shadow"
+                    className="bg-[#FF007F] hover:bg-[#CC0060] text-white rounded-xl px-5 py-2 text-sm font-bold transition-all shadow-lg shadow-[#FF007F]/25 active:scale-95 hover:scale-105"
                     disabled={importing || !searchQuery.trim()}
                   >
                     {importing ? "Поиск..." : "Найти"}
@@ -852,44 +852,44 @@ export function App() {
                 {/* Search Results Grid */}
                 {importing ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-sm text-white/50">Ищем варианты по вашему запросу...</p>
+                    <div className="w-8 h-8 border-4 border-[#FF007F] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-[#8E8E9F]">Ищем варианты по вашему запросу...</p>
                   </div>
                 ) : titles && titles.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
                     {titles.map((title, idx) => (
                       <div
                         key={`${title.description || title.id}-${idx}`}
-                        className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
+                        className="group cursor-pointer rounded-xl border border-white/10 bg-[#161622]/60 hover:border-[#FF007F]/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.15)] transition-all duration-300 hover:scale-[1.03] flex flex-col"
                         onClick={() => onSelectTitle(title)}
                       >
                         <div
-                          className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
+                          className="relative aspect-[2/3] w-full bg-[#0D0E15] border-b border-white/10 flex items-center justify-center bg-cover bg-center rounded-t-xl"
                           style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
                         >
                           <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                          <div className="relative z-10 w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
+                          <div className="relative z-10 w-12 h-12 rounded-full bg-[#FF007F] text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-[#FF007F]/45 neon-glow-pink">
                             {isMetadataTitle(title) ? (
                               <Search className="h-5 w-5" />
                             ) : (
-                              <Play className="h-5 w-5 fill-current ml-0.5" />
-                            )}
+                                <Play className="h-5 w-5 fill-current ml-0.5" />
+                              )}
                           </div>
                         </div>
                         <div className="p-4 flex-grow flex flex-col justify-between">
                           <div>
-                            <h3 className="font-bold text-base mb-1 text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{title.description}</p>
+                            <h3 className="font-bold text-base mb-1 text-white group-hover:text-[#FF007F] transition-colors line-clamp-1">{title.title}</h3>
+                            <p className="text-xs text-[#8E8E9F] line-clamp-2 leading-relaxed">{title.description}</p>
                           </div>
                           {isMetadataTitle(title) && (
                             <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                              <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">Shikimori</span>
+                              <span className="text-[10px] text-[#8E8E9F] font-bold uppercase tracking-wider">Shikimori</span>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   triggerAltSearch(title.title);
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-xs font-bold transition-all duration-200"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF007F]/10 hover:bg-[#FF007F] text-[#FF007F] hover:text-white border border-[#FF007F]/25 text-xs font-bold hover:shadow-[0_0_10px_rgba(255,0,127,0.35)] transition-all duration-200 active:scale-95"
                               >
                                 <Search className="h-3.5 w-3.5" />
                                 Найти видео
@@ -901,7 +901,7 @@ export function App() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-20 text-white/30 text-sm">
+                  <div className="text-center py-20 text-[#8E8E9F] text-sm">
                     Введите поисковый запрос выше для поиска аниме.
                   </div>
                 )}
@@ -914,7 +914,7 @@ export function App() {
                   <h3 className="text-xl font-bold text-white">История просмотров</h3>
                   <button
                     onClick={loadHistory}
-                    className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                    className="text-xs text-[#FF007F] hover:text-[#FF007F]/80 font-bold transition-colors"
                   >
                     Обновить
                   </button>
@@ -924,15 +924,15 @@ export function App() {
                     {titles.map((title, idx) => (
                       <div
                         key={`${title.description || title.id}-${idx}`}
-                        className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col"
+                        className="group cursor-pointer rounded-xl border border-white/10 bg-[#161622]/60 hover:border-[#FF007F]/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.15)] transition-all duration-300 hover:scale-[1.03] flex flex-col"
                         onClick={() => onSelectTitle(title)}
                       >
                         <div
-                          className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
+                          className="relative aspect-[2/3] w-full bg-[#0D0E15] border-b border-white/10 flex items-center justify-center bg-cover bg-center rounded-t-xl"
                           style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
                         >
                           <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                          <div className="relative z-10 w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
+                          <div className="relative z-10 w-12 h-12 rounded-full bg-[#FF007F] text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-[#FF007F]/45 neon-glow-pink">
                             {isMetadataTitle(title) ? (
                               <Search className="h-5 w-5" />
                             ) : (
@@ -942,18 +942,18 @@ export function App() {
                         </div>
                         <div className="p-4 flex-grow flex flex-col justify-between">
                           <div>
-                            <h3 className="font-bold text-base mb-1 text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h3>
-                            <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{title.description}</p>
+                            <h3 className="font-bold text-base mb-1 text-white group-hover:text-[#FF007F] transition-colors line-clamp-1">{title.title}</h3>
+                            <p className="text-xs text-[#8E8E9F] line-clamp-2 leading-relaxed">{title.description}</p>
                           </div>
                           {isMetadataTitle(title) && (
                             <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                              <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">Shikimori</span>
+                              <span className="text-[10px] text-[#8E8E9F] font-bold uppercase tracking-wider">Shikimori</span>
                               <button 
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   triggerAltSearch(title.title);
                                 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-xs font-bold transition-all duration-200"
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF007F]/10 hover:bg-[#FF007F] text-[#FF007F] hover:text-white border border-[#FF007F]/25 text-xs font-bold hover:shadow-[0_0_10px_rgba(255,0,127,0.35)] transition-all duration-200 active:scale-95"
                               >
                                 <Search className="h-3.5 w-3.5" />
                                 Найти видео
@@ -965,7 +965,7 @@ export function App() {
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-20 text-white/30 text-sm">
+                  <div className="text-center py-20 text-[#8E8E9F] text-sm">
                     История пуста. Запустите просмотр, чтобы наполнить этот раздел.
                   </div>
                 )}
@@ -985,7 +985,7 @@ export function App() {
                   </div>
                   <button
                     onClick={loadBookmarks}
-                    className="text-xs text-violet-400 hover:text-violet-300 transition-colors"
+                    className="text-xs text-[#FF007F] hover:text-[#FF007F]/80 font-bold transition-colors"
                     disabled={isLoadingBookmarks}
                   >
                     {isLoadingBookmarks ? "Обновление..." : "Обновить"}
@@ -1016,10 +1016,10 @@ export function App() {
                         <button
                           key={filter.key}
                           onClick={() => setActiveBookmarkFilter(filter.key)}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 ${
+                          className={`px-3 py-1 rounded-full text-xs font-semibold transition-all duration-200 flex items-center gap-1.5 active:scale-95 ${
                             isActive
-                              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/25'
-                              : 'bg-zinc-800/40 text-white/60 hover:text-white border border-white/5 hover:bg-zinc-800/60'
+                              ? 'bg-[#FF007F] text-white shadow-md shadow-[#FF007F]/25 font-bold'
+                              : 'bg-[#161622]/60 text-[#8E8E9F] hover:text-white border border-white/10 hover:bg-[#161622] transition-all duration-200'
                           }`}
                         >
                           {filter.label}
@@ -1036,8 +1036,8 @@ export function App() {
 
                 {isLoadingBookmarks ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-3">
-                    <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-sm text-white/50">Загружаем ваш список из Shikimori...</p>
+                    <div className="w-8 h-8 border-4 border-[#FF007F] border-t-transparent rounded-full animate-spin" />
+                    <p className="text-sm text-[#8E8E9F]">Загружаем ваш список из Shikimori...</p>
                   </div>
                 ) : shikimoriBookmarks && shikimoriBookmarks.length > 0 ? (
                   (() => {
@@ -1047,7 +1047,7 @@ export function App() {
                     });
                     if (filtered.length === 0) {
                       return (
-                        <div className="text-center py-20 text-white/30 text-sm border border-white/5 rounded-2xl bg-zinc-900/10">
+                        <div className="text-center py-20 text-[#8E8E9F] text-sm border border-white/10 rounded-2xl bg-[#161622]/10">
                           Нет закладок с выбранным статусом.
                         </div>
                       );
@@ -1057,20 +1057,20 @@ export function App() {
                         {filtered.map((title, idx) => (
                           <div
                             key={idx}
-                            className="group cursor-pointer rounded-xl border border-border bg-card/60 hover:border-violet-500/40 hover:shadow-lg hover:shadow-violet-500/5 transition-all overflow-hidden flex flex-col relative"
+                            className="group cursor-pointer rounded-xl border border-white/10 bg-[#161622]/60 hover:border-[#FF007F]/40 hover:shadow-[0_0_20px_rgba(255,0,127,0.15)] transition-all duration-300 hover:scale-[1.03] flex flex-col relative"
                             onClick={() => onSelectTitle(title)}
                           >
                             {/* Bookmark progress status badge */}
-                            <div className="absolute top-2.5 right-2.5 z-20 px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border bg-zinc-950/85 backdrop-blur shadow-md text-violet-300 border-violet-500/20">
+                            <div className="absolute top-2.5 right-2.5 z-20 px-2 py-0.5 rounded-md text-[10px] font-bold tracking-wide uppercase border bg-[#0D0E15]/85 backdrop-blur-md shadow-md text-[#00F0FF] border-[#00F0FF]/30">
                               {title.status_text ? title.status_text.split("Статус: ")[1].split(",")[0] : ""}
                             </div>
 
                             <div
-                              className="relative h-44 bg-muted border-b border-border flex items-center justify-center bg-cover bg-center"
+                              className="relative aspect-[2/3] w-full bg-[#0D0E15] border-b border-white/10 flex items-center justify-center bg-cover bg-center rounded-t-xl"
                               style={title.cover_image ? { backgroundImage: `url(${getProxiedImageUrl(title.cover_image)})` } : {}}
                             >
                               <div className="absolute inset-0 bg-black/40 group-hover:bg-black/50 transition-colors" />
-                              <div className="relative z-10 w-12 h-12 rounded-full bg-violet-600 text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-violet-600/40">
+                              <div className="relative z-10 w-12 h-12 rounded-full bg-[#FF007F] text-white flex items-center justify-center opacity-0 scale-90 group-hover:opacity-100 group-hover:scale-100 transition-all shadow-lg shadow-[#FF007F]/45 neon-glow-pink">
                                 {isMetadataTitle(title) ? (
                                   <Search className="h-5 w-5" />
                                 ) : (
@@ -1080,18 +1080,18 @@ export function App() {
                             </div>
                             <div className="p-4 flex-grow flex flex-col justify-between">
                               <div>
-                                <h3 className="font-bold text-base mb-1 text-foreground group-hover:text-violet-400 transition-colors line-clamp-1">{title.title}</h3>
-                                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{title.status_text || title.description}</p>
+                                <h3 className="font-bold text-base mb-1 text-white group-hover:text-[#FF007F] transition-colors line-clamp-1">{title.title}</h3>
+                                <p className="text-xs text-[#8E8E9F] line-clamp-2 leading-relaxed">{title.status_text || title.description}</p>
                               </div>
                               {isMetadataTitle(title) && (
                                 <div className="mt-3 pt-3 border-t border-white/5 flex items-center justify-between">
-                                  <span className="text-[10px] text-white/35 font-medium uppercase tracking-wider">Shikimori</span>
+                                  <span className="text-[10px] text-[#8E8E9F] font-bold uppercase tracking-wider">Shikimori</span>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       triggerAltSearch(title.title);
                                     }}
-                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600/10 hover:bg-violet-600 text-violet-300 hover:text-white border border-violet-500/20 text-xs font-bold transition-all duration-200"
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF007F]/10 hover:bg-[#FF007F] text-[#FF007F] hover:text-white border border-[#FF007F]/25 text-xs font-bold hover:shadow-[0_0_10px_rgba(255,0,127,0.35)] transition-all duration-200 active:scale-95"
                                   >
                                     <Search className="h-3.5 w-3.5" />
                                     Найти видео
@@ -1105,7 +1105,7 @@ export function App() {
                     );
                   })()
                 ) : (
-                  <div className="text-center py-20 text-white/30 text-sm">
+                  <div className="text-center py-20 text-[#8E8E9F] text-sm">
                     Ваш список на Shikimori пуст или не удалось загрузить данные.
                   </div>
                 )}
@@ -1139,20 +1139,20 @@ export function App() {
           />
 
           {showAltSearch && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 pointer-events-auto">
-              <div className="bg-zinc-900 border border-white/10 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl space-y-4 animate-in fade-in zoom-in duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 pointer-events-auto">
+              <div className="bg-[#0D0E15]/95 border border-[#FF007F]/20 rounded-2xl p-6 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/80 space-y-4 animate-in fade-in zoom-in duration-200 backdrop-blur-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between border-b border-white/5 pb-3">
                   <div>
                     <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                      <Search className="h-5 w-5 text-violet-400" />
+                      <Search className="h-5 w-5 text-[#FF007F]" />
                       Поиск плеера для аниме
                     </h3>
-                    <p className="text-xs text-white/50 mt-0.5">Ищем по провайдерам для: <span className="text-violet-300 font-semibold">{altSearchTitle}</span></p>
+                    <p className="text-xs text-[#8E8E9F] mt-0.5">Ищем по провайдерам для: <span className="text-[#00F0FF] font-semibold">{altSearchTitle}</span></p>
                   </div>
                   <button
                     onClick={() => setShowAltSearch(false)}
-                    className="text-white/40 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
+                    className="text-[#8E8E9F] hover:text-white transition-colors p-1.5 rounded-lg hover:bg-white/5"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -1162,8 +1162,8 @@ export function App() {
                 <div className="flex-grow overflow-y-auto space-y-3 pr-1">
                   {isLoadingAltSearch ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-3">
-                      <div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-sm text-white/40">Опрашиваем AnimeGO, Jut.su, AnimeVost, AniLiberty, Collaps...</p>
+                      <div className="w-8 h-8 border-4 border-[#FF007F] border-t-transparent rounded-full animate-spin" />
+                      <p className="text-sm text-[#8E8E9F]">Опрашиваем AnimeGO, Jut.su, AnimeVost, AniLiberty, Collaps...</p>
                     </div>
                   ) : altSearchResults && altSearchResults.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1174,7 +1174,7 @@ export function App() {
                             setShowAltSearch(false);
                             onSelectTitle(item);
                           }}
-                          className="group flex gap-3 p-3 rounded-xl border border-white/5 bg-zinc-950/20 hover:border-violet-500/40 hover:bg-violet-500/5 cursor-pointer transition-all duration-200"
+                          className="group flex gap-3 p-3 rounded-xl border border-white/10 bg-[#161622]/60 hover:border-[#FF007F]/40 hover:bg-[#FF007F]/5 cursor-pointer transition-all duration-200 active:scale-[0.98] hover:shadow-[0_0_15px_rgba(255,0,127,0.15)]"
                         >
                           <div
                             className="w-16 h-24 rounded-lg bg-cover bg-center shrink-0 border border-white/5"
@@ -1182,14 +1182,14 @@ export function App() {
                           />
                           <div className="flex flex-col justify-between overflow-hidden py-1">
                             <div>
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider bg-violet-600/20 text-violet-300 border border-violet-500/20 mb-1.5">
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[8px] font-extrabold tracking-wider bg-[#FF007F]/10 text-[#FF007F] border border-[#FF007F]/25 mb-1.5 uppercase">
                                 {item.provider}
                               </span>
-                              <h4 className="text-sm font-bold text-white group-hover:text-violet-400 transition-colors line-clamp-2 leading-snug">
+                              <h4 className="text-sm font-bold text-white group-hover:text-[#FF007F] transition-colors line-clamp-2 leading-snug">
                                 {item.title}
                               </h4>
                             </div>
-                            <p className="text-[10px] text-white/40 truncate mt-1">
+                            <p className="text-[10px] text-[#8E8E9F] truncate mt-1">
                               {item.description.startsWith("http") ? "Перейти к просмотру" : item.description}
                             </p>
                           </div>
@@ -1208,7 +1208,7 @@ export function App() {
                 <div className="flex justify-end pt-3 border-t border-white/5">
                   <button
                     onClick={() => setShowAltSearch(false)}
-                    className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-xs font-semibold transition-colors"
+                    className="px-4 py-2 bg-[#FF007F] hover:bg-[#CC0060] text-white rounded-xl text-xs font-bold transition-all active:scale-95 shadow-lg shadow-[#FF007F]/20 hover:scale-105"
                   >
                     Закрыть
                   </button>
