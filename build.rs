@@ -4,10 +4,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("cargo:rerun-if-changed=bin\\mpv-sdk");
     }
 
-    // Set path to local protoc binary if present
-    let protoc_path = std::env::current_dir()?.join("bin").join("protoc").join("bin").join("protoc.exe");
-    if protoc_path.exists() {
-        std::env::set_var("PROTOC", protoc_path);
+    // Set path to local protoc binary if present (Windows only)
+    #[cfg(target_os = "windows")]
+    {
+        let protoc_path = std::env::current_dir()?.join("bin").join("protoc").join("bin").join("protoc.exe");
+        if protoc_path.exists() {
+            std::env::set_var("PROTOC", protoc_path);
+        }
     }
 
     tonic_build::configure()
