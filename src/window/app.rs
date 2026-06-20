@@ -420,8 +420,8 @@ impl DesktopApp {
         {
             use tao::platform::unix::WindowExtUnix;
             use wry::WebViewBuilderExtUnix;
-            let vbox = window.default_vbox().map_err(|e| {
-                AppError::WebviewCreation(format!("Failed to get default vertical box from window: {e}"))
+            let vbox = window.default_vbox().ok_or_else(|| {
+                AppError::WebviewCreation("Failed to get default vertical box from window".to_string())
             })?;
             webview_builder
                 .build_gtk(vbox)
