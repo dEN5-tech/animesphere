@@ -47,7 +47,13 @@ impl DesktopApp {
         let window = self.create_main_window(&event_loop)?;
 
         #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
-        let tray_context = self.create_system_tray(&proxy)?;
+        let tray_context = match self.create_system_tray(&proxy) {
+            Ok(t) => Some(t),
+            Err(e) => {
+                println!("[SystemTray] Warning: System tray creation failed: {e}");
+                None
+            }
+        };
 
         #[cfg(not(target_os = "android"))]
         let wid = Self::platform_window_id(&window);
@@ -130,13 +136,15 @@ impl DesktopApp {
                 }
                 #[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
                 Event::UserEvent(UserEvent::MenuEvent(menu_event)) => {
-                    if menu_event.id == tray_context.restore_id {
-                        Self::show_and_focus_window(&window);
-                    } else if menu_event.id == tray_context.exit_id {
-                        let discord: Arc<dyn crate::services::DiscordPresenceService> =
-                            shaku::HasComponent::resolve(&*container_ref);
-                        discord.clear();
-                        *control_flow = ControlFlow::Exit;
+                    if let Some(ref tray) = tray_context {
+                        if menu_event.id == tray.restore_id {
+                            Self::show_and_focus_window(&window);
+                        } else if menu_event.id == tray.exit_id {
+                            let discord: Arc<dyn crate::services::DiscordPresenceService> =
+                                shaku::HasComponent::resolve(&*container_ref);
+                            discord.clear();
+                            *control_flow = ControlFlow::Exit;
+                        }
                     }
                 }
                 #[cfg(not(target_os = "android"))]

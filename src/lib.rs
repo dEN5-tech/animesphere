@@ -57,7 +57,9 @@ fn run_app() {
 
     let container = AppModule::builder().build();
     let app = DesktopApp::new(container, runtime_handle);
-    let _ = app.run();
+    if let Err(e) = app.run() {
+        eprintln!("Fatal Application Error: {:?}", e);
+    }
 }
 
 #[cfg(target_os = "android")]
