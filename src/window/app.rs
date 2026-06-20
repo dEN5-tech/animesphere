@@ -319,7 +319,7 @@ impl DesktopApp {
         };
 
         let proxy_bg = proxy.clone();
-        let bg_webview = match WebViewBuilder::new()
+        let builder = WebViewBuilder::new()
             .with_ipc_handler(move |msg| {
                 if let Ok(envelope) =
                     serde_json::from_str::<crate::window::types::IpcEnvelope>(msg.body())
@@ -332,9 +332,26 @@ impl DesktopApp {
                         data,
                     });
                 }
-            })
+            });
+
+        #[cfg(target_os = "linux")]
+        let bg_webview = {
+            use tao::platform::unix::WindowExtUnix;
+            use wry::WebViewBuilderExtUnix;
+            let vbox = bg_window.default_vbox().ok_or_else(|| {
+                AppError::WebviewCreation("Failed to get default vertical box from background window".to_string())
+            })?;
+            builder
+                .build_gtk(vbox)
+                .map_err(|e| AppError::WebviewCreation(e.to_string()))
+        };
+
+        #[cfg(not(target_os = "linux"))]
+        let bg_webview = builder
             .build(&bg_window)
-        {
+            .map_err(|e| AppError::WebviewCreation(e.to_string()));
+
+        let bg_webview = match bg_webview {
             Ok(wv) => wv,
             Err(e) => {
                 println!("[BackgroundWebView] Warning: Failed to create background webview: {e}");
@@ -377,8 +394,10 @@ impl DesktopApp {
         let ipc_container = self.container.clone();
         let ipc_tokio = self.tokio_runtime.clone();
 
-        let webview_builder = WebViewBuilder::new()
-            .with_transparent(true)
+        let webview_builder = WebViewBuilder::new();
+        #[cfg(not(target_os = "linux"))]
+        let webview_builder = webview_builder.with_transparent(true);
+        let webview_builder = webview_builder
             .with_initialization_script(Self::init_script())
             .with_document_title_changed_handler(|title| {
                 println!("[WebView] document title changed: {title}");

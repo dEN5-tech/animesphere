@@ -1,6 +1,6 @@
 [package]
 name = "animesphere"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["dEN5-tech <moyadres_1@mail.ru>"]
 edition = "2021"
 
