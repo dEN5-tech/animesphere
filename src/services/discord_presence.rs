@@ -1,16 +1,21 @@
 use std::sync::Mutex;
 
+use shaku::Component;
+use super::{Anime4KMode, Anime4KQuality, DiscordPresenceService};
+
+// =========================================================================
+// Desktop Implementation (Windows, Linux, macOS)
+// =========================================================================
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 use discord_rich_presence::{
     activity,
     DiscordIpc,
     DiscordIpcClient,
 };
-use shaku::Component;
 
-use super::{Anime4KMode, Anime4KQuality, DiscordPresenceService};
-
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 #[derive(Default)]
-struct PresenceState {
+pub(crate) struct PresenceState {
     client_id: Option<String>,
     client: Option<DiscordIpcClient>,
     connected: bool,
@@ -21,6 +26,7 @@ struct PresenceState {
     last_signature: Option<String>,
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 #[derive(Component)]
 #[shaku(interface = DiscordPresenceService)]
 pub struct DiscordPresenceServiceImpl {
@@ -28,11 +34,13 @@ pub struct DiscordPresenceServiceImpl {
     state: Mutex<PresenceState>,
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 struct EffectiveDiscordConfig {
     enabled: bool,
     client_id: Option<String>,
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 impl DiscordPresenceServiceImpl {
     fn config() -> EffectiveDiscordConfig {
         let cfg = super::config::load_config();
@@ -210,6 +218,7 @@ impl DiscordPresenceServiceImpl {
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 impl Default for DiscordPresenceServiceImpl {
     fn default() -> Self {
         Self {
@@ -218,6 +227,7 @@ impl Default for DiscordPresenceServiceImpl {
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux", target_os = "macos"))]
 impl DiscordPresenceService for DiscordPresenceServiceImpl {
     fn update_now_playing(&self, title: String, cover_url: Option<String>) {
         if let Ok(mut state) = self.state.lock() {
@@ -253,4 +263,28 @@ impl DiscordPresenceService for DiscordPresenceServiceImpl {
             Self::sync_locked(&mut state);
         }
     }
+}
+
+// =========================================================================
+// Stub Implementation (Android and other non-desktop platforms)
+// =========================================================================
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+#[derive(Component)]
+#[shaku(interface = DiscordPresenceService)]
+pub struct DiscordPresenceServiceImpl {}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+impl Default for DiscordPresenceServiceImpl {
+    fn default() -> Self {
+        Self {}
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
+impl DiscordPresenceService for DiscordPresenceServiceImpl {
+    fn update_now_playing(&self, _title: String, _cover_url: Option<String>) {}
+    fn set_paused(&self, _paused: bool) {}
+    fn set_anime4k(&self, _mode: Anime4KMode) {}
+    fn clear(&self) {}
+    fn refresh(&self) {}
 }

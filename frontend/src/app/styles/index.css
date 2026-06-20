@@ -1,0 +1,277 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* ── Deep Dark Base ──────────────────────────── */
+    --base-dark:       8, 8, 16;       /* #080810 */
+    --base-dark-2:     13, 14, 21;     /* #0D0E15 */
+    --card-surface:    22, 22, 34;     /* #161622 */
+
+    /* ── Neon Accents ────────────────────────────── */
+    --neon-pink:       255, 0, 127;    /* #FF007F */
+    --neon-pink-dark:  204, 0,  96;    /* #CC0060 */
+    --neon-cyan:       0,  240, 255;   /* #00F0FF */
+    --neon-cyan-dark:  0,  180, 204;   /* #00B4CC */
+
+    /* ── Muted ───────────────────────────────────── */
+    --muted-text:      178, 178, 197;  /* #B2B2C5 */
+
+    /* ── Tailwind CSS vars ───────────────────────── */
+    --background:      240 17% 5%;
+    --foreground:      0 0% 98%;
+    --card:            240 20% 11%;
+    --card-foreground: 0 0% 98%;
+    --popover:         240 17% 5%;
+    --popover-foreground: 0 0% 98%;
+    --primary:         330 100% 50%;  /* pink */
+    --primary-foreground: 210 20% 98%;
+    --secondary:       240 20% 13%;
+    --secondary-foreground: 0 0% 98%;
+    --muted:           240 20% 13%;
+    --muted-foreground: 240 10% 70%;
+    --accent:          240 20% 16%;
+    --accent-foreground: 0 0% 98%;
+    --destructive:     0 62% 30%;
+    --destructive-foreground: 0 0% 98%;
+    --border:          240 15% 14%;
+    --input:           240 15% 14%;
+    --ring:            330 100% 50%;
+    --radius:          0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    background-color: rgb(var(--base-dark));
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Outfit', 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(135deg,
+      rgb(var(--base-dark)) 0%,
+      rgb(var(--base-dark-2)) 50%,
+      rgb(var(--base-dark)) 100%);
+    min-height: 100vh;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Neon Glow Keyframes
+   ──────────────────────────────────────────────────────────────── */
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.7; }
+}
+
+@keyframes neon-border-glow {
+  0%, 100% { box-shadow: 0 0 8px rgba(var(--neon-pink), 0.4); }
+  50%       { box-shadow: 0 0 20px rgba(var(--neon-pink), 0.7); }
+}
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes scanline-sweep {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+@keyframes scanline-shimmer {
+  0% { opacity: 0.2; }
+  50% { opacity: 0.3; }
+  100% { opacity: 0.2; }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Utility: Neon Text Gradient
+   ──────────────────────────────────────────────────────────────── */
+.neon-gradient-text {
+  background: linear-gradient(90deg, #FF007F, #00F0FF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.neon-glow-pink {
+  box-shadow: 0 0 12px rgba(var(--neon-pink), 0.5),
+              0 0 30px rgba(var(--neon-pink), 0.15);
+}
+
+.neon-glow-cyan {
+  box-shadow: 0 0 12px rgba(var(--neon-cyan), 0.5),
+              0 0 30px rgba(var(--neon-cyan), 0.15);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Utility: Cyberpunk Grid Background
+   ──────────────────────────────────────────────────────────────── */
+.cyber-grid {
+  background-image: radial-gradient(circle at 1px 1px, rgba(255, 0, 127, 0.035) 1.5px, transparent 0);
+  background-size: 24px 24px;
+}
+
+.cyber-grid::before {
+  content: "";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(8, 8, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), 
+              linear-gradient(90deg, rgba(255, 0, 127, 0.02), rgba(0, 240, 255, 0.01), rgba(255, 0, 127, 0.02));
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+  opacity: 0.25;
+  animation: scanline-shimmer 8s infinite ease-in-out;
+  z-index: 0;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Player — clear html and body background during playback
+   ──────────────────────────────────────────────────────────────── */
+html.playback-active,
+body.playback-active {
+  background: transparent !important;
+  background-color: transparent !important;
+  background-image: none !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Custom Webkit Scrollbar — neon gradient accent
+   ──────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(8, 8, 16, 0.3);
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #FF007F, #00F0FF);
+  border-radius: 99px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #CC0060, #00B4CC);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Range input — neon pink thumb
+   ──────────────────────────────────────────────────────────────── */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #FF007F;
+  box-shadow: 0 0 8px rgba(var(--neon-pink), 0.6);
+  cursor: pointer;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Mockup Aesthetics: Ticker, Glass Panel & Custom Scrollbar
+   ──────────────────────────────────────────────────────────────── */
+@keyframes ticker {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+.animate-ticker {
+  display: inline-block;
+  white-space: nowrap;
+  animation: ticker 15s linear infinite;
+}
+
+.glass-panel {
+  background: rgba(22, 22, 34, 0.85);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 0, 127, 0.2);
+}
+
+.player-glass-panel {
+  background: rgba(45, 26, 31, 0.75); /* surface-container with opacity */
+  backdrop-filter: blur(16px);
+  border: 1px solid #00dbe9; /* neon cyan */
+}
+
+.playlist-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+.playlist-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+}
+.playlist-scroll::-webkit-scrollbar-thumb {
+  background: #00dbe9;
+  border-radius: 2px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Main Lobby Mockup Styling (Neon Cyberpunk Grid & Scanline Effect)
+   ──────────────────────────────────────────────────────────────── */
+body.lobby-mode {
+  background-color: #0D0714 !important;
+  background-image: 
+      linear-gradient(rgba(13, 7, 20, 0.95), rgba(13, 7, 20, 0.95)),
+      linear-gradient(0deg, transparent 24%, rgba(255, 0, 127, 0.05) 25%, rgba(255, 0, 127, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 127, 0.05) 75%, rgba(255, 0, 127, 0.05) 76%, transparent 77%, transparent),
+      linear-gradient(90deg, transparent 24%, rgba(255, 0, 127, 0.05) 25%, rgba(255, 0, 127, 0.05) 26%, transparent 27%, transparent 74%, rgba(255, 0, 127, 0.05) 75%, rgba(255, 0, 127, 0.05) 76%, transparent 77%, transparent) !important;
+  background-size: 100% 100%, 50px 50px, 50px 50px !important;
+  color: #fbdae1 !important;
+  font-family: 'Outfit', sans-serif;
+  overflow-x: hidden;
+}
+
+body.lobby-mode::after {
+  content: " ";
+  display: block;
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+  z-index: 999;
+  background-size: 100% 2px, 3px 100%;
+  pointer-events: none;
+}
+
+.glass-card {
+  transition: all 0.3s ease;
+}
+.glass-card:hover {
+  border-color: #FF007F !important;
+  box-shadow: 0 0 20px rgba(255, 0, 127, 0.3);
+  transform: translateY(-4px);
+}
+
+.neon-btn {
+  background: linear-gradient(135deg, #FF007F 0%, #00F0FF 100%) !important;
+  box-shadow: 0 0 15px rgba(255, 0, 127, 0.4);
+  border: none !important;
+  color: white !important;
+}
+.neon-btn:hover {
+  box-shadow: 0 0 25px rgba(255, 0, 127, 0.6);
+  filter: brightness(1.1);
+}
+
+.neon-text-glow {
+  text-shadow: 0 0 10px rgba(255, 0, 127, 0.5);
+}
+
+.ticker-scroll {
+  display: inline-block;
+  white-space: nowrap;
+  animation: ticker 30s linear infinite;
+}

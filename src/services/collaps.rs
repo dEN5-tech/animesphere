@@ -57,8 +57,10 @@ fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     headers.insert("Referer", reqwest::header::HeaderValue::from_static("https://kinokrad.my/"));
 
     let builder = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-        .default_headers(headers);
+        .user_agent("Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+        .default_headers(headers)
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(10));
 
     let builder = if !proxy_url.trim().is_empty() {
         println!("[Collaps] Building HTTP client with proxy: {}", proxy_url);
@@ -228,7 +230,7 @@ async fn search_collaps(query: &str, proxy_url: &str, provider_scheme: &str) -> 
     let client = build_client(proxy_url)?;
     let url = format!("{}/list", DEFAULT_API_HOST);
 
-    let res = client.get(url)
+    let mut res = client.get(&url)
         .query(&[
             ("token", DEFAULT_TOKEN),
             ("name", query),
@@ -236,20 +238,46 @@ async fn search_collaps(query: &str, proxy_url: &str, provider_scheme: &str) -> 
         .header("Origin", "https://kinokrad.my")
         .header("Referer", "https://kinokrad.my/")
         .send()
-        .await
-        .map_err(|e| {
-            println!("[Collaps] Search HTTP request failed: {}", e);
-            AppError::Mpv(format!("Collaps search request failed: {}", e))
-        })?;
+        .await;
+
+    if !proxy_url.is_empty() {
+        let should_fallback = match &res {
+            Err(_) => true,
+            Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+        };
+        if should_fallback {
+            println!("[Collaps] Search request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+            let direct_client = build_client("")?;
+            res = direct_client.get(&url)
+                .query(&[
+                    ("token", DEFAULT_TOKEN),
+                    ("name", query),
+                ])
+                .header("Origin", "https://kinokrad.my")
+                .header("Referer", "https://kinokrad.my/")
+                .send()
+                .await;
+        }
+    }
+
+    let res = res.map_err(|e| {
+        println!("[Collaps] Search HTTP request failed: {}", e);
+        AppError::Mpv(format!("Collaps search request failed: {}", e))
+    })?;
 
     if !res.status().is_success() {
         println!("[Collaps] Search returned error status: {}", res.status());
         return Err(AppError::Mpv(format!("Collaps search returned HTTP {}", res.status())));
     }
 
-    let root: CollapsSearchRoot = res.json().await
+    let body = res.text().await.map_err(|e| {
+        println!("[Collaps] Failed to read search response body: {}", e);
+        AppError::Mpv(format!("Collaps search body read failed: {}", e))
+    })?;
+
+    let root: CollapsSearchRoot = serde_json::from_str(&body)
         .map_err(|e| {
-            println!("[Collaps] Search JSON deserialization failed: {}", e);
+            println!("[Collaps] Search JSON deserialization failed: {}\nRaw body (first 500 chars): {:?}", e, &body[..body.len().min(500)]);
             AppError::Serialization(format!("Collaps search JSON parse failed: {}", e))
         })?;
 
@@ -450,7 +478,11 @@ impl CollapsService for CollapsServiceImpl {}
 #[async_trait::async_trait]
 impl ContentProvider for CollapsServiceImpl {
     fn can_handle(&self, identifier: &str) -> bool {
-        identifier.starts_with("collaps://") || identifier.contains("collaps.to") || identifier.contains("bhcesh.me") || identifier.contains("luxembd.ws")
+        identifier.starts_with("collaps://") 
+            || identifier.contains("collaps.to") 
+            || identifier.contains("bhcesh.me") 
+            || identifier.contains("luxembd.ws") 
+            || identifier.contains("interkh.com")
     }
 
     async fn search(&self, query: &str, proxy_url: &str) -> Result<Vec<ProviderSearchResult>, AppError> {

@@ -1,8 +1,20 @@
 [package]
 name = "animesphere"
 version = "0.1.3"
+authors = ["dEN5-tech <moyadres_1@mail.ru>"]
 edition = "2021"
 
+# ─── Library target (required for cargo-mobile2 Android/iOS) ────────────────
+[lib]
+name = "animesphere"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# ─── Desktop binary (calls lib::main()) ─────────────────────────────────────
+[[bin]]
+name = "animesphere"
+path = "gen/bin/desktop.rs"
+
+# ─── Common dependencies (all platforms) ────────────────────────────────────
 [dependencies]
 # Desktop Windowing and Webview
 tao = "0.30"
@@ -19,25 +31,53 @@ futures = "0.3"
 tonic = { version = "0.12", features = ["tls", "transport"] }
 prost = "0.13"
 
-# Native Multimedia Playback (MPV bindings)
-libmpv2 = "6.0.0"
-libmpv2-sys = "4.0.1"
-
 # Structuring & Parsing
 async-trait = "0.1"
 thiserror = "2.0"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12", features = ["json", "blocking"] }
+
+# Use rustls to avoid OpenSSL system-dep on Android; gzip for automatic decompression
+reqwest = { version = "0.12", features = ["json", "rustls-tls", "gzip", "brotli", "deflate"], default-features = false }
 scraper = "0.27.0"
 html-escape = "0.2"
 raw-window-handle = "0.6"
-discord-rich-presence = "1.1"
 uuid = { version = "1.10", features = ["v4"] }
 dashmap = "6.1"
 parking_lot = "0.12"
 base64 = "0.22.1"
 open = "5.3"
+serde_yaml = "0.9"
+md5 = "0.7"
+lol_html = "0.4"
 
+# Database ORM (Diesel with SQLite + r2d2 pool + embedded migrations)
+# bundled = compile SQLite from source (required for Android cross-compilation,
+#            since the NDK sysroot does not expose -lsqlite3)
+diesel = { version = "2.2", features = ["sqlite", "r2d2"] }
+diesel_migrations = "2.2"
+libsqlite3-sys = { version = "0.30", features = ["bundled"] }
+
+# ─── Desktop-only dependencies ───────────────────────────────────────────────
+[target.'cfg(not(target_os = "android"))'.dependencies]
+libmpv2 = "6.0.0"
+libmpv2-sys = "4.0.1"
+# Aliased as mpv_client so code can use mpv_client:: namespace
+mpv_client = { package = "mpv-client-cross", path = "mpv-client-cross" }
+discord-rich-presence = "1.1"
+tray-icon = "0.20"
+
+# ─── Windows-specific dependencies ───────────────────────────────────────────
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.52"
+
+# ─── Android-specific dependencies ───────────────────────────────────────────
+[target.'cfg(target_os = "android")'.dependencies]
+ndk-context = "0.1"
+jni = "0.21"
+
+# ─── Build dependencies ───────────────────────────────────────────────────────
 [build-dependencies]
 tonic-build = "0.12"
+
+

@@ -9,7 +9,8 @@ pub struct AnimegoServiceImpl {}
 
 fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     let client_builder = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(10));
     
     let client_builder = if !proxy_url.trim().is_empty() {
         let proxy = Proxy::all(proxy_url)
@@ -52,21 +53,24 @@ struct VoiceOption {
     cvh_id: Option<String>,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(serde::Deserialize, Debug, Clone)]
 struct CvhPlaylistItem {
-    #[serde(rename = "season")]
+    #[serde(rename = "season", default)]
     season: i32,
-    #[serde(rename = "episode")]
+    #[serde(rename = "episode", default)]
     episode: i32,
     #[serde(rename = "vkId")]
     vk_id: String,
-    #[serde(rename = "voiceStudio")]
+    #[serde(rename = "voiceStudio", default)]
     voice_studio: String,
 }
 
+// CVH API may return {"items":[...]} OR {"data":[...]} OR a bare array
 #[derive(serde::Deserialize)]
-struct CvhPlaylistResponse {
-    items: Option<Vec<CvhPlaylistItem>>,
+#[serde(untagged)]
+enum CvhPlaylistResponse {
+    Object { items: Option<Vec<CvhPlaylistItem>>, data: Option<Vec<CvhPlaylistItem>> },
+    Array(Vec<CvhPlaylistItem>),
 }
 
 impl AnimegoServiceImpl {
@@ -74,12 +78,29 @@ impl AnimegoServiceImpl {
         let client = build_client(proxy_url)?;
         let url = self.get_player_url_for_episode(anime_id, episode, proxy_url).await?;
         
-        let res = client.get(&url)
+        let mut res = client.get(&url)
             .header("X-Requested-With", "XMLHttpRequest")
             .header("Referer", "https://animego.org/")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Player fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] get_voices with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&url)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .header("Referer", "https://animego.org/")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Player fetch failed: {}", e)))?;
             
         let json_body: serde_json::Value = res.json()
             .await
@@ -143,12 +164,29 @@ impl AnimegoServiceImpl {
         let client = build_client(proxy_url)?;
         let first_player_url = format!("https://animego.org/player/{}", anime_id);
         
-        let res = client.get(&first_player_url)
+        let mut res = client.get(&first_player_url)
             .header("X-Requested-With", "XMLHttpRequest")
             .header("Referer", "https://animego.org/")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("First player fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] get_player_url_for_episode with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&first_player_url)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .header("Referer", "https://animego.org/")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("First player fetch failed: {}", e)))?;
             
         let json_body: serde_json::Value = res.json()
             .await
@@ -179,12 +217,29 @@ impl AnimegoServiceImpl {
     async fn aniboom_get_stream(&self, embed_url: &str, proxy_url: &str) -> Result<String, AppError> {
         let client = build_client(proxy_url)?;
         
-        let res = client.get(embed_url)
+        let mut res = client.get(embed_url)
             .header("Referer", "https://animego.org/")
             .header("Accept-Language", "ru-RU,ru;q=0.9")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Aniboom embed page fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] Aniboom embed fetch with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(embed_url)
+                    .header("Referer", "https://animego.org/")
+                    .header("Accept-Language", "ru-RU,ru;q=0.9")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Aniboom embed page fetch failed: {}", e)))?;
             
         let html_content = res.text()
             .await
@@ -223,24 +278,84 @@ impl AnimegoServiceImpl {
     }
 
     async fn cvh_get_playlist(&self, cvh_id: &str, proxy_url: &str) -> Result<Vec<CvhPlaylistItem>, AppError> {
-        let client = build_client(proxy_url)?;
-        let url = format!(
-            "https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?pub=747&aggr=mali&id={}",
-            cvh_id
-        );
-        
-        let res = client.get(&url)
-            .header("Referer", "https://animego.org/")
-            .header("Accept", "application/json")
-            .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("CVH playlist request failed: {}", e)))?;
-            
-        let response: CvhPlaylistResponse = res.json()
-            .await
-            .map_err(|e| AppError::Serialization(format!("CVH playlist JSON parse failed: {}", e)))?;
-            
-        Ok(response.items.unwrap_or_default())
+        let mut client = build_client(proxy_url)?;
+        let mut using_proxy = !proxy_url.is_empty();
+
+        // Try both known CDN API endpoints (the pub/aggr params may rotate)
+        let urls = [
+            format!("https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?pub=747&aggr=mali&id={}", cvh_id),
+            format!("https://plapi.cdnvideohub.com/api/v1/player/sv/playlist?id={}", cvh_id),
+        ];
+
+        let mut last_err = String::new();
+        for url in &urls {
+            let mut res = client.get(url)
+                .header("Referer", "https://animego.org/")
+                .header("Accept", "application/json")
+                .header("Origin", "https://animego.org")
+                .send()
+                .await;
+
+            if using_proxy {
+                let should_fallback = match &res {
+                    Err(_) => true,
+                    Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+                };
+                if should_fallback {
+                    println!("[AnimeGO] CVH playlist request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                    client = build_client("")?;
+                    using_proxy = false;
+                    res = client.get(url)
+                        .header("Referer", "https://animego.org/")
+                        .header("Accept", "application/json")
+                        .header("Origin", "https://animego.org")
+                        .send()
+                        .await;
+                }
+            }
+
+            let res = match res {
+                Ok(r) => r,
+                Err(e) => { last_err = format!("CVH playlist request failed: {}", e); continue; }
+            };
+
+            let status = res.status();
+            // Get raw bytes so we can log the body on failure
+            let body_bytes = match res.bytes().await {
+                Ok(b) => b,
+                Err(e) => { last_err = format!("CVH playlist body read failed: {}", e); continue; }
+            };
+
+            if !status.is_success() {
+                let preview = String::from_utf8_lossy(&body_bytes[..body_bytes.len().min(300)]);
+                last_err = format!("CVH playlist HTTP {}: {}", status, preview);
+                println!("[CVH] Playlist endpoint {} returned {}: {}", url, status, preview);
+                continue;
+            }
+
+            match serde_json::from_slice::<CvhPlaylistResponse>(&body_bytes) {
+                Ok(response) => {
+                    let items = match response {
+                        CvhPlaylistResponse::Object { items, data } => {
+                            items.or(data).unwrap_or_default()
+                        }
+                        CvhPlaylistResponse::Array(arr) => arr,
+                    };
+                    println!("[CVH] Playlist OK — {} items from {}", items.len(), url);
+                    return Ok(items);
+                }
+                Err(e) => {
+                    let preview = String::from_utf8_lossy(&body_bytes[..body_bytes.len().min(300)]);
+                    last_err = format!("CVH playlist JSON parse failed: {} | body: {}", e, preview);
+                    println!("[CVH] {} from {}", last_err, url);
+                    // Don't continue — the endpoint answered, body just changed shape;
+                    // fall through to return the error.
+                    break;
+                }
+            }
+        }
+
+        Err(AppError::Serialization(format!("Parsing or serialization failure: {}", last_err)))
     }
     
     async fn cvh_get_stream(
@@ -276,9 +391,22 @@ impl AnimegoServiceImpl {
         for ep in &matched_episodes {
             studios.push(ep.voice_studio.clone());
         }
+
+        // If only one option exists, use it regardless of studio name match
+        if matched_episodes.len() == 1 {
+            println!("[CVH] Only one studio option ('{}') — using it for translation '{}'", studios[0], translation);
+            return self.cvh_get_stream_by_id(&matched_episodes[0].vk_id, proxy_url).await;
+        }
         
-        let matched_studio = match_cvh_studio(translation, &studios)
-            .ok_or_else(|| AppError::Mpv(format!("Failed to match voice translation '{}' in CVH options: {:?}", translation, studios)))?;
+        let matched_studio = match match_cvh_studio(translation, &studios) {
+            Some(s) => s,
+            None => {
+                println!("[CVH] No exact studio match for '{}' in {:?} — trying first option", translation, studios);
+                // Fallback: use the first available studio rather than hard-failing
+                studios.into_iter().next()
+                    .ok_or_else(|| AppError::Mpv("CVH studios list is empty".to_string()))?
+            }
+        };
             
         let matched_item = matched_episodes.into_iter()
             .find(|item| item.voice_studio == matched_studio)
@@ -291,12 +419,29 @@ impl AnimegoServiceImpl {
         let client = build_client(proxy_url)?;
         let url = format!("https://plapi.cdnvideohub.com/api/v1/player/sv/video/{}", vk_id);
         
-        let res = client.get(&url)
+        let mut res = client.get(&url)
             .header("Referer", "https://animego.org/")
             .header("Accept", "application/json")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("CVH video details request failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] CVH video details request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&url)
+                    .header("Referer", "https://animego.org/")
+                    .header("Accept", "application/json")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("CVH video details request failed: {}", e)))?;
             
         let json_body: serde_json::Value = res.json()
             .await
@@ -359,7 +504,8 @@ impl ContentProvider for AnimegoServiceImpl {
     }
 
     async fn get_anime_info(&self, identifier: &str, proxy_url: &str) -> Result<ProviderAnimeInfo, AppError> {
-        let client = build_client(proxy_url)?;
+        let mut client = build_client(proxy_url)?;
+        let mut using_proxy = !proxy_url.is_empty();
         
         let anime_url = if identifier.starts_with("http") {
             identifier.to_string()
@@ -367,10 +513,22 @@ impl ContentProvider for AnimegoServiceImpl {
             format!("https://animego.org/anime/{}", identifier)
         };
         
-        let res = client.get(&anime_url)
-            .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("AnimeGO anime page fetch failed: {}", e)))?;
+        let mut res = client.get(&anime_url).send().await;
+
+        if using_proxy {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] Anime page fetch with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                client = build_client("")?;
+                using_proxy = false;
+                res = client.get(&anime_url).send().await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("AnimeGO anime page fetch failed: {}", e)))?;
             
         let html_content = res.text()
             .await
@@ -435,12 +593,29 @@ impl ContentProvider for AnimegoServiceImpl {
         let anime_id_ref = anime_id.clone();
         let schedule_url = format!("https://animego.org/anime/{}/9999999/schedule/load", anime_id_ref);
         
-        let schedule_res = client.get(&schedule_url)
+        let mut schedule_res = client.get(&schedule_url)
             .header("X-Requested-With", "XMLHttpRequest")
             .header("Referer", &anime_url)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("AnimeGO schedule load request failed: {}", e)))?;
+            .await;
+
+        if using_proxy {
+            let should_fallback = match &schedule_res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] Schedule request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                schedule_res = direct_client.get(&schedule_url)
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .header("Referer", &anime_url)
+                    .send()
+                    .await;
+            }
+        }
+
+        let schedule_res = schedule_res.map_err(|e| AppError::Mpv(format!("AnimeGO schedule load request failed: {}", e)))?;
             
         let json_body: serde_json::Value = schedule_res.json()
             .await
@@ -502,11 +677,27 @@ impl ContentProvider for AnimegoServiceImpl {
         let base_url = "https://animego.org";
         let search_url = format!("{}/search/anime", base_url);
         
-        let res = client.get(&search_url)
+        let mut res = client.get(&search_url)
             .query(&[("q", query)])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("AnimeGO search request failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeGO] Search request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+                let direct_client = build_client("")?;
+                res = direct_client.get(&search_url)
+                    .query(&[("q", query)])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("AnimeGO search request failed: {}", e)))?;
             
         let html_content = res.text()
             .await

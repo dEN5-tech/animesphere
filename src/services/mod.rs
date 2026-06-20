@@ -1,4 +1,7 @@
+#![allow(dead_code)]
+
 pub mod grpc_anime;
+#[cfg(not(target_os = "android"))]
 pub mod mpv_player;
 pub mod animevost;
 pub mod config;
@@ -6,11 +9,16 @@ pub mod jutsu;
 pub mod animego;
 pub mod shikimori;
 pub mod provider_manager;
+#[cfg(not(target_os = "android"))]
 pub mod discord_presence;
 pub mod headless;
 pub mod aniliberty;
+#[cfg(not(target_os = "android"))]
 pub mod thumbnail_generator;
 pub mod collaps;
+pub mod kodik;
+pub mod bestsimilar;
+
 
 use shaku::Interface;
 use crate::error::AppError;
@@ -71,6 +79,9 @@ pub struct PlaybackState {
     pub volume: f64,
     pub demuxer_cache_duration: f64,
     pub nerd_stats: Option<NerdStats>,
+    pub current_edition: i64,
+    pub editions_count: i64,
+    pub edition_list: String,
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +106,7 @@ pub enum Anime4KMode {
     ModeC(Anime4KQuality),
 }
 
+#[cfg(not(target_os = "android"))]
 pub enum MpvCommand {
     AttachWindow(i64),
     LoadVideo(String),
@@ -107,6 +119,7 @@ pub enum MpvCommand {
     ClearShaders,
     CycleAudio,
     CycleSubtitles,
+    SetQuality(i32),
 }
 
 #[async_trait::async_trait]
@@ -123,11 +136,13 @@ pub trait AnimeService: Interface + Send + Sync {
     async fn get_stream(&self, id: i32) -> Result<grpc_anime::proto::StreamResponse, AppError>;
 }
 
+#[cfg(not(target_os = "android"))]
 pub trait MpvService: Interface + Send + Sync {
     fn send_command(&self, cmd: MpvCommand) -> Result<(), AppError>;
     fn subscribe(&self) -> tokio::sync::broadcast::Receiver<PlaybackEvent>;
 }
 
+#[cfg(not(target_os = "android"))]
 pub trait DiscordPresenceService: Interface + Send + Sync {
     fn update_now_playing(&self, title: String, cover_url: Option<String>);
     fn set_paused(&self, paused: bool);
@@ -167,6 +182,8 @@ pub trait ShikimoriService: ContentProvider + Interface + Send + Sync {
     async fn refresh_access_token(&self) -> Result<(), AppError>;
     async fn get_user_profile(&self) -> Result<serde_json::Value, AppError>;
     async fn get_user_bookmarks(&self, limit: i32) -> Result<serde_json::Value, AppError>;
+    async fn get_user_friends(&self) -> Result<serde_json::Value, AppError>;
+    async fn get_friend_bookmarks(&self, friend_id_or_nickname: &str, limit: i32) -> Result<serde_json::Value, AppError>;
 }
 
 #[async_trait::async_trait]
@@ -178,8 +195,15 @@ pub trait CollapsService: ContentProvider + Interface + Send + Sync {}
 #[async_trait::async_trait]
 pub trait CollapsDashService: ContentProvider + Interface + Send + Sync {}
 
+#[async_trait::async_trait]
+pub trait KodikService: ContentProvider + Interface + Send + Sync {}
+
+#[async_trait::async_trait]
+pub trait BestSimilarService: ContentProvider + Interface + Send + Sync {}
+
 pub use provider_manager::ProviderManager;
 
+#[cfg(not(target_os = "android"))]
 #[async_trait::async_trait]
 pub trait ThumbnailService: Interface + Send + Sync {
     async fn load_video(&self, url: String) -> Result<(), AppError>;

@@ -14,7 +14,7 @@ use super::AnimeService;
 #[derive(Component)]
 #[shaku(interface = AnimeService)]
 pub struct AnimeServiceImpl {
-    #[shaku(default = "http://[::1]:50051".to_string())]
+    #[shaku(default = "http://127.0.0.1:50051".to_string())]
     endpoint: String,
 }
 

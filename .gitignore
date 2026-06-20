@@ -1,15 +1,34 @@
-/target
-/dist_portable
-/animesphere_portable.zip
-/config.json
-/database.json
-/episodes.json
-/frontend/node_modules
-/frontend/dist
+# Rust
+target/
+**/*.rs.bk
+
+# cargo-mobile2
+.cargo/
+/gen
+
+# macOS
 .DS_Store
 
-# Exclude large binaries that exceed GitHub's 100MB file limit
-/bin/mpv-sdk/libmpv-2.dll
+animesphere-sync
 
-# Lampac reference codebase (local only, has its own git repo)
-/Lampac
+browser-extension/node_modules
+
+dist_android
+
+dist_portable
+
+dist_windows
+*.apk
+*.zip
+*.png
+*.xml
+Lampac/
+*.idsig
+assets/assets/
+assets/index.html
+assets/shaders/
+bin/scrcpy/
+bin/mpv-sdk/libmpv-2.dll
+debug.keystore
+scratch/
+browser-extension/dist/

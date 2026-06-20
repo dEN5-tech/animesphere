@@ -2,14 +2,16 @@ pub mod proto {
     tonic::include_proto!("anime");
 }
 
-use std::fs::File;
-use std::io::{Read, Write};
 use serde::{Deserialize, Serialize};
 use proto::anime_service_server::{AnimeService, AnimeServiceServer};
 use proto::{Anime, AnimeListResponse, Empty, StreamRequest, StreamResponse};
 use tonic::{Request, Response, Status};
+use diesel::prelude::*;
+use std::sync::OnceLock;
+use std::sync::RwLock;
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Queryable, Insertable, AsChangeset)]
+#[diesel(table_name = crate::schema::episodes)]
 pub struct DbAnime {
     pub id: i32,
     pub title: String,
@@ -18,23 +20,24 @@ pub struct DbAnime {
     pub cover_image: String,
 }
 
-// Load database from file or write seeded defaults if missing
+// Load database from SQLite or write seeded defaults if missing
 fn load_database() -> Vec<DbAnime> {
-    let path = crate::services::config::get_episodes_path();
-    crate::services::config::ensure_config_dir();
-    if path.exists() {
-        if let Ok(mut file) = File::open(&path) {
-            let mut content = String::new();
-            if file.read_to_string(&mut content).is_ok() {
-                if let Ok(data) = serde_json::from_str::<Vec<DbAnime>>(&content) {
-                    println!("Successfully loaded {} catalog entries from episodes.json", data.len());
-                    return data;
-                }
-            }
-        }
+    let pool = crate::services::config::get_db_pool();
+    let mut conn = pool.get().expect("Failed to get DB connection");
+    
+    use crate::schema::episodes::dsl::*;
+    
+    let db_episodes = episodes
+        .order(id.asc())
+        .load::<DbAnime>(&mut conn)
+        .unwrap_or_default();
+
+    if !db_episodes.is_empty() {
+        println!("Successfully loaded {} catalog entries from SQLite database", db_episodes.len());
+        return db_episodes;
     }
 
-    println!("episodes.json not found or corrupted. Seeding default anime metadata catalog...");
+    println!("SQLite episodes table empty. Seeding default anime metadata catalog...");
     let seeded = vec![
         DbAnime {
             id: 1,
@@ -108,17 +111,14 @@ fn load_database() -> Vec<DbAnime> {
         },
     ];
 
-    if let Ok(content) = serde_json::to_string_pretty(&seeded) {
-        if let Ok(mut file) = File::create(&path) {
-            let _ = file.write_all(content.as_bytes());
-        }
+    for item in &seeded {
+        let _ = diesel::insert_into(episodes)
+            .values(item)
+            .execute(&mut conn);
     }
 
     seeded
 }
-
-use std::sync::OnceLock;
-use std::sync::RwLock;
 
 fn get_database() -> &'static RwLock<Vec<DbAnime>> {
     static DB: OnceLock<RwLock<Vec<DbAnime>>> = OnceLock::new();
@@ -129,6 +129,26 @@ pub fn reload_database() -> Result<(), String> {
     let fresh_db = load_database();
     let mut db_lock = get_database().write().map_err(|e| e.to_string())?;
     *db_lock = fresh_db;
+    Ok(())
+}
+
+pub fn save_episodes(new_episodes: &[DbAnime]) -> Result<(), String> {
+    let pool = crate::services::config::get_db_pool();
+    let mut conn = pool.get().map_err(|e| e.to_string())?;
+
+    conn.transaction::<_, diesel::result::Error, _>(|c| {
+        diesel::delete(crate::schema::episodes::table).execute(c)?;
+        for item in new_episodes {
+            diesel::insert_into(crate::schema::episodes::table)
+                .values(item)
+                .execute(c)?;
+        }
+        Ok(())
+    }).map_err(|e| e.to_string())?;
+
+    // Reload the in-memory cache
+    let _ = reload_database();
+
     Ok(())
 }
 

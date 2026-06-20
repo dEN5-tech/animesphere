@@ -38,7 +38,8 @@ struct ApiResponse<T> {
 
 fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     let client_builder = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(10));
     
     let client_builder = if !proxy_url.trim().is_empty() {
         let proxy = Proxy::all(proxy_url)
@@ -56,11 +57,28 @@ fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
 impl AnimeVostService for AnimeVostServiceImpl {
     async fn get_info(&self, id: i32, proxy_url: &str) -> Result<AnimeVostTitle, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.post("https://api.animevost.org/v1/info")
+        let url = "https://api.animevost.org/v1/info";
+        let mut res = client.post(url)
             .form(&[("id", id.to_string())])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Info fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeVost] Info fetch request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post(url)
+                    .form(&[("id", id.to_string())])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Info fetch failed: {}", e)))?;
 
         let data: ApiResponse<AnimeVostTitle> = res.json()
             .await
@@ -75,11 +93,28 @@ impl AnimeVostService for AnimeVostServiceImpl {
 
     async fn get_playlist(&self, id: i32, proxy_url: &str) -> Result<Vec<AnimeVostEpisode>, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.post("https://api.animevost.org/v1/playlist")
+        let url = "https://api.animevost.org/v1/playlist";
+        let mut res = client.post(url)
             .form(&[("id", id.to_string())])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Playlist fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeVost] Playlist fetch request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post(url)
+                    .form(&[("id", id.to_string())])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Playlist fetch failed: {}", e)))?;
 
         let playlist: Vec<AnimeVostEpisode> = res.json()
             .await
@@ -90,14 +125,34 @@ impl AnimeVostService for AnimeVostServiceImpl {
 
     async fn get_list(&self, page: i32, limit: i32, proxy_url: &str) -> Result<Vec<AnimeVostTitle>, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.post("https://api.animevost.org/v1/list")
+        let url = "https://api.animevost.org/v1/list";
+        let mut res = client.post(url)
             .form(&[
                 ("page", page.to_string()),
                 ("limit", limit.to_string()),
             ])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("List fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeVost] List fetch request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post(url)
+                    .form(&[
+                        ("page", page.to_string()),
+                        ("limit", limit.to_string()),
+                    ])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("List fetch failed: {}", e)))?;
 
         let data: ApiResponse<AnimeVostTitle> = res.json()
             .await
@@ -108,14 +163,34 @@ impl AnimeVostService for AnimeVostServiceImpl {
 
     async fn get_last(&self, page: i32, limit: i32, proxy_url: &str) -> Result<Vec<AnimeVostTitle>, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.post("https://api.animevost.org/v1/last")
+        let url = "https://api.animevost.org/v1/last";
+        let mut res = client.post(url)
             .form(&[
                 ("page", page.to_string()),
                 ("limit", limit.to_string()),
             ])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Last fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeVost] Last fetch request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post(url)
+                    .form(&[
+                        ("page", page.to_string()),
+                        ("limit", limit.to_string()),
+                    ])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Last fetch failed: {}", e)))?;
 
         let data: ApiResponse<AnimeVostTitle> = res.json()
             .await
@@ -126,11 +201,28 @@ impl AnimeVostService for AnimeVostServiceImpl {
 
     async fn search_vost(&self, query: &str, proxy_url: &str) -> Result<Vec<AnimeVostTitle>, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.post("https://api.animevost.org/v1/search")
+        let url = "https://api.animevost.org/v1/search";
+        let mut res = client.post(url)
             .form(&[("name", query.to_string())])
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Search fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AnimeVost] Search fetch request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post(url)
+                    .form(&[("name", query.to_string())])
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Search fetch failed: {}", e)))?;
 
         let data: ApiResponse<AnimeVostTitle> = res.json()
             .await

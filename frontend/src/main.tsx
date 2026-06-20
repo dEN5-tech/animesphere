@@ -1,5 +1,14 @@
-import { render } from 'preact'
-import './index.css'
-import { App } from './app.tsx'
+import { render } from 'preact';
+import './app/styles/index.css';
+import './app/services/container';
+import { App } from './app/App.tsx';
 
-render(<App />, document.getElementById('app')!)
+console.info('[AnimeSphere] frontend main.tsx start');
+console.info('[AnimeSphere] frontend root exists:', !!document.getElementById('app'));
+
+render(
+  <App />,
+  document.getElementById('app')!
+);
+
+console.info('[AnimeSphere] frontend render() returned');

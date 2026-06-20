@@ -1,0 +1,5 @@
+[app]
+name = "animesphere"
+stylized-name = "Animesphere"
+identifier = "com.example.animesphere"
+template-pack = "bevy"

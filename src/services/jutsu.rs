@@ -33,7 +33,8 @@ pub struct JutsuServiceImpl {}
 
 fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     let client_builder = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0");
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0")
+        .timeout(std::time::Duration::from_secs(10));
     
     let client_builder = if !proxy_url.trim().is_empty() {
         let proxy = Proxy::all(proxy_url)
@@ -51,10 +52,23 @@ fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
 impl JutsuService for JutsuServiceImpl {
     async fn get_anime_info_raw(&self, url: &str, proxy_url: &str) -> Result<JutsuAnimeInfo, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.get(url)
+        let mut res = client.get(url)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Jut.su request failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Jut.su] Anime info page request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(url).send().await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Jut.su request failed: {}", e)))?;
         
         let html_content = res.text()
             .await
@@ -233,10 +247,23 @@ impl JutsuService for JutsuServiceImpl {
 
     async fn get_mp4_link(&self, url: &str, proxy_url: &str) -> Result<HashMap<String, String>, AppError> {
         let client = build_client(proxy_url)?;
-        let res = client.get(url)
+        let mut res = client.get(url)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Jut.su video page fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Jut.su] Video page fetch with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(url).send().await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Jut.su video page fetch failed: {}", e)))?;
             
         let html_content = res.text()
             .await

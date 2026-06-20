@@ -2,7 +2,7 @@ use shaku::{Component, Interface};
 use crate::error::AppError;
 use std::sync::Arc;
 use super::{ProviderAnimeInfo, ProviderSearchResult};
-use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService, AniLibertyService, CollapsService, CollapsDashService};
+use super::{AnimeVostService, JutsuService, AnimegoService, ShikimoriService, AniLibertyService, CollapsService, CollapsDashService, KodikService, BestSimilarService};
 
 #[async_trait::async_trait]
 pub trait ProviderManager: Interface + Send + Sync {
@@ -29,6 +29,10 @@ pub struct ProviderManagerImpl {
     collaps: Arc<dyn CollapsService>,
     #[shaku(inject)]
     collaps_dash: Arc<dyn CollapsDashService>,
+    #[shaku(inject)]
+    kodik: Arc<dyn KodikService>,
+    #[shaku(inject)]
+    bestsimilar: Arc<dyn BestSimilarService>,
 }
 
 #[async_trait::async_trait]
@@ -41,6 +45,8 @@ impl ProviderManager for ProviderManagerImpl {
             || self.aniliberty.can_handle(identifier)
             || self.collaps.can_handle(identifier)
             || self.collaps_dash.can_handle(identifier)
+            || self.kodik.can_handle(identifier)
+            || self.bestsimilar.can_handle(identifier)
     }
 
     async fn get_anime_info(&self, identifier: &str, proxy_url: &str) -> Result<ProviderAnimeInfo, AppError> {
@@ -58,6 +64,10 @@ impl ProviderManager for ProviderManagerImpl {
             self.collaps.get_anime_info(identifier, proxy_url).await
         } else if self.collaps_dash.can_handle(identifier) {
             self.collaps_dash.get_anime_info(identifier, proxy_url).await
+        } else if self.kodik.can_handle(identifier) {
+            self.kodik.get_anime_info(identifier, proxy_url).await
+        } else if self.bestsimilar.can_handle(identifier) {
+            self.bestsimilar.get_anime_info(identifier, proxy_url).await
         } else {
             Err(AppError::Mpv(format!("No provider can handle identifier: {}", identifier)))
         }
@@ -93,6 +103,14 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.collaps_dash.search(query, proxy_url).await {
                 results.extend(res);
             }
+        } else if provider.eq_ignore_ascii_case("kodik") {
+            if let Ok(res) = self.kodik.search(query, proxy_url).await {
+                results.extend(res);
+            }
+        } else if provider.eq_ignore_ascii_case("bestsimilar") {
+            if let Ok(res) = self.bestsimilar.search(query, proxy_url).await {
+                results.extend(res);
+            }
         } else {
             // all providers
             if let Ok(res) = self.animevost.search(query, proxy_url).await {
@@ -116,6 +134,12 @@ impl ProviderManager for ProviderManagerImpl {
             if let Ok(res) = self.collaps_dash.search(query, proxy_url).await {
                 results.extend(res);
             }
+            if let Ok(res) = self.kodik.search(query, proxy_url).await {
+                results.extend(res);
+            }
+            if let Ok(res) = self.bestsimilar.search(query, proxy_url).await {
+                results.extend(res);
+            }
         }
         Ok(results)
     }
@@ -133,8 +157,12 @@ impl ProviderManager for ProviderManagerImpl {
             self.collaps.resolve_stream_url(stream_url, proxy_url).await
         } else if self.collaps_dash.can_handle(stream_url) {
             self.collaps_dash.resolve_stream_url(stream_url, proxy_url).await
+        } else if self.kodik.can_handle(stream_url) {
+            self.kodik.resolve_stream_url(stream_url, proxy_url).await
+        } else if self.bestsimilar.can_handle(stream_url) {
+            self.bestsimilar.resolve_stream_url(stream_url, proxy_url).await
         } else {
-            // Fallback — return as-is (handles shikimori:// and direct URLs)
+            // Fallback — return as-is
             Ok(stream_url.to_string())
         }
     }

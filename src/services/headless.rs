@@ -6,6 +6,7 @@ use crate::error::AppError;
 use super::HeadlessService;
 use crate::window::UserEvent;
 
+#[allow(dead_code)]
 pub struct HeadlessChannels {
     proxy: Arc<parking_lot::RwLock<Option<tao::event_loop::EventLoopProxy<UserEvent>>>>,
     callbacks: Arc<DashMap<String, oneshot::Sender<Result<serde_json::Value, AppError>>>>,
@@ -34,25 +35,41 @@ impl HeadlessService for HeadlessServiceImpl {
     }
 
     async fn navigate(&self, url: &str) -> Result<(), AppError> {
-        let proxy = self.channels.proxy.read().clone().ok_or_else(|| AppError::Mpv("Headless proxy not initialized".to_string()))?;
-        proxy.send_event(UserEvent::BackgroundNavigate { url: url.to_string() })
-            .map_err(|e| AppError::Mpv(format!("Failed to send background navigate event: {}", e)))?;
-        Ok(())
+        #[cfg(target_os = "android")]
+        {
+            let _ = url;
+            Err(AppError::Mpv("Headless service is not supported on Android".to_string()))
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            let proxy = self.channels.proxy.read().clone().ok_or_else(|| AppError::Mpv("Headless proxy not initialized".to_string()))?;
+            proxy.send_event(UserEvent::BackgroundNavigate { url: url.to_string() })
+                .map_err(|e| AppError::Mpv(format!("Failed to send background navigate event: {}", e)))?;
+            Ok(())
+        }
     }
 
     async fn eval(&self, script: &str) -> Result<serde_json::Value, AppError> {
-        let proxy = self.channels.proxy.read().clone().ok_or_else(|| AppError::Mpv("Headless proxy not initialized".to_string()))?;
-        let callback_id = uuid::Uuid::new_v4().to_string();
-        let (tx, rx) = oneshot::channel();
-        
-        self.channels.callbacks.insert(callback_id.clone(), tx);
-        
-        proxy.send_event(UserEvent::BackgroundExecuteScript {
-            script: script.to_string(),
-            callback_id,
-        }).map_err(|e| AppError::Mpv(format!("Failed to send background eval event: {}", e)))?;
-        
-        rx.await.map_err(|_| AppError::Mpv("Headless eval dropped".to_string()))?
+        #[cfg(target_os = "android")]
+        {
+            let _ = script;
+            Err(AppError::Mpv("Headless service is not supported on Android".to_string()))
+        }
+        #[cfg(not(target_os = "android"))]
+        {
+            let proxy = self.channels.proxy.read().clone().ok_or_else(|| AppError::Mpv("Headless proxy not initialized".to_string()))?;
+            let callback_id = uuid::Uuid::new_v4().to_string();
+            let (tx, rx) = oneshot::channel();
+            
+            self.channels.callbacks.insert(callback_id.clone(), tx);
+            
+            proxy.send_event(UserEvent::BackgroundExecuteScript {
+                script: script.to_string(),
+                callback_id,
+            }).map_err(|e| AppError::Mpv(format!("Failed to send background eval event: {}", e)))?;
+            
+            rx.await.map_err(|_| AppError::Mpv("Headless eval dropped".to_string()))?
+        }
     }
 
     fn resolve_callback(&self, callback_id: &str, success: bool, data: serde_json::Value) {

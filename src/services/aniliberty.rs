@@ -1,4 +1,3 @@
-use std::sync::Arc;
 use shaku::Component;
 use crate::error::AppError;
 use super::{AniLibertyService, ContentProvider, ProviderAnimeInfo, ProviderSearchResult, ProviderEpisode};
@@ -14,7 +13,8 @@ pub struct AniLibertyServiceImpl {}
 
 fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     let builder = reqwest::Client::builder()
-        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36");
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+        .timeout(std::time::Duration::from_secs(10));
 
     let builder = if !proxy_url.trim().is_empty() {
         let proxy = Proxy::all(proxy_url)
@@ -51,9 +51,10 @@ impl ContentProvider for AniLibertyServiceImpl {
 
     async fn search(&self, query: &str, proxy_url: &str) -> Result<Vec<ProviderSearchResult>, AppError> {
         let client = build_client(proxy_url)?;
+        let url = format!("{}/anime/catalog/releases", ANILIBERTY_API_BASE);
 
-        let res = client
-            .get(format!("{}/anime/catalog/releases", ANILIBERTY_API_BASE))
+        let mut res = client
+            .get(&url)
             .query(&[
                 ("page", "1"),
                 ("limit", "24"),
@@ -61,8 +62,30 @@ impl ContentProvider for AniLibertyServiceImpl {
             ])
             .header("Referer", "https://aniliberty.top/")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("AniLiberty search request failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AniLiberty] Search request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+                let direct_client = build_client("")?;
+                res = direct_client
+                    .get(&url)
+                    .query(&[
+                        ("page", "1"),
+                        ("limit", "24"),
+                        ("f[search]", query),
+                    ])
+                    .header("Referer", "https://aniliberty.top/")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("AniLiberty search request failed: {}", e)))?;
 
         if !res.status().is_success() {
             return Err(AppError::Mpv(format!("AniLiberty search returned HTTP {}", res.status())));
@@ -102,13 +125,31 @@ impl ContentProvider for AniLibertyServiceImpl {
         } else {
             identifier
         };
+        let url = format!("{}/anime/releases/{}", ANILIBERTY_API_BASE, alias);
 
-        let res = client
-            .get(format!("{}/anime/releases/{}", ANILIBERTY_API_BASE, alias))
+        let mut res = client
+            .get(&url)
             .header("Referer", "https://aniliberty.top/")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("AniLiberty release fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[AniLiberty] Release fetch request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+                let direct_client = build_client("")?;
+                res = direct_client
+                    .get(&url)
+                    .header("Referer", "https://aniliberty.top/")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("AniLiberty release fetch failed: {}", e)))?;
 
         if !res.status().is_success() {
             return Err(AppError::Mpv(format!("AniLiberty release returned HTTP {}", res.status())));

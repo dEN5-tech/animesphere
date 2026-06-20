@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "AnimeSphere Integration",
+  "version": "1.0.0",
+  "description": "Официальное расширение для AnimeSphere. Открывайте раздачи, плейлисты и видеопотоки в один клик.",
+  "permissions": [
+    "activeTab",
+    "contextMenus"
+  ],
+  "host_permissions": [
+    "*://*.shikimori.one/*",
+    "*://*.shikimori.me/*",
+    "*://*.jut.su/*",
+    "*://*.animego.org/*"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_icon": {
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "background": {
+    "scripts": ["background.js"]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "*://*.shikimori.one/*",
+        "*://*.shikimori.me/*",
+        "*://*.jut.su/*",
+        "*://*.animego.org/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "icons": {
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

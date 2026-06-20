@@ -1,0 +1,27 @@
+[package]
+name = "mpv-client-cross"
+description = "Bindings for libmpv client API that allow you to create plugins for MPV in Rust"
+keywords = ["mpv", "libmpv", "api"]
+categories = ["api-bindings"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+readme.workspace = true
+
+[features]
+# Include nothing by default
+default = []
+bindgen = ["mpv-client-sys/bindgen"]
+macros = ["mpv-client-macros"]
+
+[dependencies]
+mpv-client-sys.workspace = true
+mpv-client-macros = { workspace = true, optional = true }
+serde.workspace = true
+log.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

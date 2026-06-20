@@ -2,18 +2,23 @@ use shaku::Component;
 use crate::error::AppError;
 use super::{ShikimoriService, ContentProvider, ProviderAnimeInfo, ProviderSearchResult};
 use reqwest::Proxy;
+use std::sync::Arc;
 
 const SHIKIMORI_BASE: &str = "https://shikimori.one";
 
 #[derive(Component)]
 #[shaku(interface = ShikimoriService)]
-pub struct ShikimoriServiceImpl {}
+pub struct ShikimoriServiceImpl {
+    #[shaku(inject)]
+    bestsimilar: Arc<dyn super::BestSimilarService>,
+}
 
 fn build_client(proxy_url: &str) -> Result<reqwest::Client, AppError> {
     let builder = reqwest::Client::builder()
         .user_agent(
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
-        );
+        )
+        .timeout(std::time::Duration::from_secs(10));
 
     let builder = if !proxy_url.trim().is_empty() {
         let proxy = Proxy::all(proxy_url)
@@ -56,34 +61,54 @@ impl ShikimoriService for ShikimoriServiceImpl {
 
         let auth_url = self.get_auth_url(&config.shikimori_client_id);
 
-        // Bind listener on 50052
-        let listener = std::net::TcpListener::bind("127.0.0.1:50052")
+        // Bind listener on 50052 using async tokio TcpListener
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:50052")
+            .await
             .map_err(|e| AppError::Mpv(format!("Не удалось запустить локальный сервер на порту 50052: {}", e)))?;
 
-        // Launch browser
+        // Launch browser - use JNI on Android, open::that on desktop
+        #[cfg(not(target_os = "android"))]
         let _ = open::that(&auth_url);
+        #[cfg(target_os = "android")]
+        if let Err(e) = crate::window::ipc::open_browser_android(&auth_url) {
+            println!("[Shikimori] Failed to open browser on Android: {:?}", e);
+        }
 
         let mut auth_code = None;
-        if let Ok((mut stream, _)) = listener.accept() {
-            let mut buffer = [0; 2048];
-            use std::io::Read;
-            if let Ok(size) = stream.read(&mut buffer) {
-                let request_str = String::from_utf8_lossy(&buffer[..size]);
-                if let Some(code_idx) = request_str.find("code=") {
-                    let after_code = &request_str[code_idx + 5..];
-                    let code = after_code.split(|c: char| c.is_whitespace() || c == '&').next().unwrap_or("");
-                    auth_code = Some(code.to_string());
-                }
-            }
+        
+        // Wait for connection with a 120s timeout
+        let accept_res = tokio::time::timeout(
+            std::time::Duration::from_secs(120),
+            listener.accept()
+        ).await;
 
-            use std::io::Write;
-            let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
-                <html><body style='font-family: sans-serif; background: #09090b; color: #f4f4f5; text-align: center; padding: 50px;'>\
-                <h1 style='color: #8b5cf6;'>AnimeSphere</h1>\
-                <p>Авторизация в Shikimori успешно завершена! Вы можете закрыть эту вкладку.</p>\
-                </body></html>";
-            let _ = stream.write_all(response.as_bytes());
-            let _ = stream.flush();
+        match accept_res {
+            Ok(Ok((mut stream, _))) => {
+                let mut buffer = [0; 2048];
+                use tokio::io::{AsyncReadExt, AsyncWriteExt};
+                if let Ok(size) = stream.read(&mut buffer).await {
+                    let request_str = String::from_utf8_lossy(&buffer[..size]);
+                    if let Some(code_idx) = request_str.find("code=") {
+                        let after_code = &request_str[code_idx + 5..];
+                        let code = after_code.split(|c: char| c.is_whitespace() || c == '&').next().unwrap_or("");
+                        auth_code = Some(code.to_string());
+                    }
+                }
+
+                let response = "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n\r\n\
+                    <html><body style='font-family: sans-serif; background: #09090b; color: #f4f4f5; text-align: center; padding: 50px;'>\
+                    <h1 style='color: #8b5cf6;'>AnimeSphere</h1>\
+                    <p>Авторизация в Shikimori успешно завершена! Вы можете закрыть эту вкладку.</p>\
+                    </body></html>";
+                let _ = stream.write_all(response.as_bytes()).await;
+                let _ = stream.flush().await;
+            }
+            Ok(Err(e)) => {
+                return Err(AppError::Mpv(format!("Ошибка при установлении соединения: {}", e)));
+            }
+            Err(_) => {
+                return Err(AppError::Mpv("Время ожидания авторизации (120 сек) истекло.".to_string()));
+            }
         }
 
         let Some(code) = auth_code else {
@@ -100,12 +125,29 @@ impl ShikimoriService for ShikimoriServiceImpl {
             ("redirect_uri", "http://127.0.0.1:50052/"),
         ];
 
-        let res = client.post("https://shikimori.one/oauth/token")
+        let mut res = client.post("https://shikimori.one/oauth/token")
             .header("User-Agent", "AnimeSphere/1.0.0")
             .form(&params)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Запрос обмена токена завершился ошибкой: {}", e)))?;
+            .await;
+
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] Token exchange request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post("https://shikimori.one/oauth/token")
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .form(&params)
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Запрос обмена токена завершился ошибкой: {}", e)))?;
 
         if !res.status().is_success() {
             let err_txt = res.text().await.unwrap_or_default();
@@ -145,12 +187,29 @@ impl ShikimoriService for ShikimoriServiceImpl {
             ("refresh_token", &config.shikimori_refresh_token),
         ];
 
-        let res = client.post("https://shikimori.one/oauth/token")
+        let mut res = client.post("https://shikimori.one/oauth/token")
             .header("User-Agent", "AnimeSphere/1.0.0")
             .form(&params)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Запрос обновления токена завершился ошибкой: {}", e)))?;
+            .await;
+
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] Token refresh request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.post("https://shikimori.one/oauth/token")
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .form(&params)
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Запрос обновления токена завершился ошибкой: {}", e)))?;
 
         if !res.status().is_success() {
             return Err(AppError::Mpv(format!("Ошибка Shikimori при обновлении токена: HTTP {}", res.status())));
@@ -185,28 +244,58 @@ impl ShikimoriService for ShikimoriServiceImpl {
 
         let client = build_client(&config.proxy_url)?;
         
-        let fetch_profile = |token: &str| {
-            let client = client.clone();
-            let token = token.to_string();
-            async move {
-                client.get("https://shikimori.one/api/users/whoami")
-                    .header("User-Agent", "AnimeSphere/1.0.0")
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await
-            }
-        };
+        let mut res = client.get("https://shikimori.one/api/users/whoami")
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+            .send()
+            .await;
 
-        let mut res = fetch_profile(&config.shikimori_access_token).await
-            .map_err(|e| AppError::Mpv(format!("whoami request failed: {}", e)))?;
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] whoami request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get("https://shikimori.one/api/users/whoami")
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+                    .send()
+                    .await;
+            }
+        }
+
+        let mut res = res.map_err(|e| AppError::Mpv(format!("whoami request failed: {}", e)))?;
 
         // Handle token expiration / 401 Unauthorized
         if res.status().as_u16() == 401 {
             println!("Shikimori returned 401. Attempting to refresh access token...");
             if self.refresh_access_token().await.is_ok() {
                 let fresh_config = crate::services::config::load_config();
-                res = fetch_profile(&fresh_config.shikimori_access_token).await
-                    .map_err(|e| AppError::Mpv(format!("whoami retry request failed: {}", e)))?;
+                let fresh_client = build_client(&fresh_config.proxy_url)?;
+                let mut retry_res = fresh_client.get("https://shikimori.one/api/users/whoami")
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                    .send()
+                    .await;
+
+                if !fresh_config.proxy_url.trim().is_empty() {
+                    let should_fallback = match &retry_res {
+                        Err(_) => true,
+                        Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+                    };
+                    if should_fallback {
+                        println!("[Shikimori] whoami retry request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                        let direct_client = build_client("")?;
+                        retry_res = direct_client.get("https://shikimori.one/api/users/whoami")
+                            .header("User-Agent", "AnimeSphere/1.0.0")
+                            .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                            .send()
+                            .await;
+                    }
+                }
+                res = retry_res.map_err(|e| AppError::Mpv(format!("whoami retry request failed: {}", e)))?;
             }
         }
 
@@ -233,29 +322,58 @@ impl ShikimoriService for ShikimoriServiceImpl {
         let client = build_client(&config.proxy_url)?;
         let url = format!("https://shikimori.one/api/users/{}/anime_rates?limit={}", user_id, limit);
 
-        let fetch_bookmarks = |token: &str| {
-            let client = client.clone();
-            let url = url.clone();
-            let token = token.to_string();
-            async move {
-                client.get(&url)
-                    .header("User-Agent", "AnimeSphere/1.0.0")
-                    .header("Authorization", format!("Bearer {}", token))
-                    .send()
-                    .await
-            }
-        };
+        let mut res = client.get(&url)
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+            .send()
+            .await;
 
-        let mut res = fetch_bookmarks(&config.shikimori_access_token).await
-            .map_err(|e| AppError::Mpv(format!("anime_rates request failed: {}", e)))?;
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] anime_rates request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+                    .send()
+                    .await;
+            }
+        }
+
+        let mut res = res.map_err(|e| AppError::Mpv(format!("anime_rates request failed: {}", e)))?;
 
         // Handle token expiration / 401 Unauthorized
         if res.status().as_u16() == 401 {
             println!("Shikimori returned 401 for bookmarks. Attempting token refresh...");
             if self.refresh_access_token().await.is_ok() {
                 let fresh_config = crate::services::config::load_config();
-                res = fetch_bookmarks(&fresh_config.shikimori_access_token).await
-                    .map_err(|e| AppError::Mpv(format!("anime_rates retry request failed: {}", e)))?;
+                let fresh_client = build_client(&fresh_config.proxy_url)?;
+                let mut retry_res = fresh_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                    .send()
+                    .await;
+
+                if !fresh_config.proxy_url.trim().is_empty() {
+                    let should_fallback = match &retry_res {
+                        Err(_) => true,
+                        Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+                    };
+                    if should_fallback {
+                        println!("[Shikimori] anime_rates retry request with proxy failed or was blocked. Retrying WITHOUT proxy.");
+                        let direct_client = build_client("")?;
+                        retry_res = direct_client.get(&url)
+                            .header("User-Agent", "AnimeSphere/1.0.0")
+                            .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                            .send()
+                            .await;
+                    }
+                }
+                res = retry_res.map_err(|e| AppError::Mpv(format!("anime_rates retry request failed: {}", e)))?;
             }
         }
 
@@ -265,6 +383,154 @@ impl ShikimoriService for ShikimoriServiceImpl {
 
         let bookmarks: serde_json::Value = res.json().await
             .map_err(|e| AppError::Serialization(format!("Parse anime_rates JSON failed: {}", e)))?;
+        Ok(bookmarks)
+    }
+
+    async fn get_user_friends(&self) -> Result<serde_json::Value, AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_access_token.trim().is_empty() {
+            return Err(AppError::Mpv("No access token found".to_string()));
+        }
+
+        let profile = self.get_user_profile().await?;
+        let user_id = profile.get("id").and_then(|v| v.as_i64())
+            .ok_or_else(|| AppError::Mpv("Failed to get user ID from profile".to_string()))?;
+
+        let client = build_client(&config.proxy_url)?;
+        let url = format!("https://shikimori.one/api/users/{}/friends", user_id);
+
+        let mut res = client.get(&url)
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+            .send()
+            .await;
+
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] friends request with proxy failed. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+                    .send()
+                    .await;
+            }
+        }
+
+        let mut res = res.map_err(|e| AppError::Mpv(format!("friends request failed: {}", e)))?;
+
+        if res.status().as_u16() == 401 {
+            println!("Shikimori returned 401 for friends. Refreshing token...");
+            if self.refresh_access_token().await.is_ok() {
+                let fresh_config = crate::services::config::load_config();
+                let fresh_client = build_client(&fresh_config.proxy_url)?;
+                let mut retry_res = fresh_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                    .send()
+                    .await;
+
+                if !fresh_config.proxy_url.trim().is_empty() {
+                    let should_fallback = match &retry_res {
+                        Err(_) => true,
+                        Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+                    };
+                    if should_fallback {
+                        println!("[Shikimori] friends retry request with proxy failed. Retrying WITHOUT proxy.");
+                        let direct_client = build_client("")?;
+                        retry_res = direct_client.get(&url)
+                            .header("User-Agent", "AnimeSphere/1.0.0")
+                            .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                            .send()
+                            .await;
+                    }
+                }
+                res = retry_res.map_err(|e| AppError::Mpv(format!("friends retry request failed: {}", e)))?;
+            }
+        }
+
+        if !res.status().is_success() {
+            return Err(AppError::Mpv(format!("friends returned HTTP {}", res.status())));
+        }
+
+        let friends: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Parse friends JSON failed: {}", e)))?;
+        Ok(friends)
+    }
+
+    async fn get_friend_bookmarks(&self, friend_id_or_nickname: &str, limit: i32) -> Result<serde_json::Value, AppError> {
+        let config = crate::services::config::load_config();
+        if config.shikimori_access_token.trim().is_empty() {
+            return Err(AppError::Mpv("No access token found".to_string()));
+        }
+
+        let client = build_client(&config.proxy_url)?;
+        let url = format!("https://shikimori.one/api/users/{}/anime_rates?limit={}", friend_id_or_nickname, limit);
+
+        let mut res = client.get(&url)
+            .header("User-Agent", "AnimeSphere/1.0.0")
+            .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+            .send()
+            .await;
+
+        if !config.proxy_url.trim().is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] friend anime_rates request with proxy failed. Retrying WITHOUT proxy.");
+                let direct_client = build_client("")?;
+                res = direct_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", &config.shikimori_access_token))
+                    .send()
+                    .await;
+            }
+        }
+
+        let mut res = res.map_err(|e| AppError::Mpv(format!("friend anime_rates request failed: {}", e)))?;
+
+        if res.status().as_u16() == 401 {
+            println!("Shikimori returned 401 for friend bookmarks. Refreshing token...");
+            if self.refresh_access_token().await.is_ok() {
+                let fresh_config = crate::services::config::load_config();
+                let fresh_client = build_client(&fresh_config.proxy_url)?;
+                let mut retry_res = fresh_client.get(&url)
+                    .header("User-Agent", "AnimeSphere/1.0.0")
+                    .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                    .send()
+                    .await;
+
+                if !fresh_config.proxy_url.trim().is_empty() {
+                    let should_fallback = match &retry_res {
+                        Err(_) => true,
+                        Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+                    };
+                    if should_fallback {
+                        println!("[Shikimori] friend anime_rates retry request with proxy failed. Retrying WITHOUT proxy.");
+                        let direct_client = build_client("")?;
+                        retry_res = direct_client.get(&url)
+                            .header("User-Agent", "AnimeSphere/1.0.0")
+                            .header("Authorization", format!("Bearer {}", fresh_config.shikimori_access_token))
+                            .send()
+                            .await;
+                    }
+                }
+                res = retry_res.map_err(|e| AppError::Mpv(format!("friend anime_rates retry request failed: {}", e)))?;
+            }
+        }
+
+        if !res.status().is_success() {
+            return Err(AppError::Mpv(format!("friend anime_rates returned HTTP {}", res.status())));
+        }
+
+        let bookmarks: serde_json::Value = res.json().await
+            .map_err(|e| AppError::Serialization(format!("Parse friend anime_rates JSON failed: {}", e)))?;
         Ok(bookmarks)
     }
 }
@@ -279,15 +545,35 @@ impl ContentProvider for ShikimoriServiceImpl {
 
     async fn search(&self, query: &str, proxy_url: &str) -> Result<Vec<ProviderSearchResult>, AppError> {
         let client = build_client(proxy_url)?;
+        let url = format!("{}/animes/autocomplete/v2", SHIKIMORI_BASE);
 
-        let res = client
-            .get(format!("{}/animes/autocomplete/v2", SHIKIMORI_BASE))
+        let mut res = client
+            .get(&url)
             .query(&[("search", query)])
             .header("Accept", "application/json, text/plain, */*")
             .header("X-Requested-With", "XMLHttpRequest")
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Shikimori search request failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] Search request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+                let direct_client = build_client("")?;
+                res = direct_client
+                    .get(&url)
+                    .query(&[("search", query)])
+                    .header("Accept", "application/json, text/plain, */*")
+                    .header("X-Requested-With", "XMLHttpRequest")
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Shikimori search request failed: {}", e)))?;
 
         if res.status().as_u16() == 429 {
             return Err(AppError::Mpv(
@@ -380,11 +666,27 @@ impl ContentProvider for ShikimoriServiceImpl {
             format!("{}/animes/{}", SHIKIMORI_BASE, identifier)
         };
 
-        let res = client
+        let mut res = client
             .get(&anime_url)
             .send()
-            .await
-            .map_err(|e| AppError::Mpv(format!("Shikimori page fetch failed: {}", e)))?;
+            .await;
+
+        if !proxy_url.is_empty() {
+            let should_fallback = match &res {
+                Err(_) => true,
+                Ok(r) => r.status() == reqwest::StatusCode::GONE || r.status() == reqwest::StatusCode::FORBIDDEN,
+            };
+            if should_fallback {
+                println!("[Shikimori] Anime page request with proxy failed or was blocked (status: {:?}). Retrying WITHOUT proxy.", res.as_ref().map(|r| r.status()));
+                let direct_client = build_client("")?;
+                res = direct_client
+                    .get(&anime_url)
+                    .send()
+                    .await;
+            }
+        }
+
+        let res = res.map_err(|e| AppError::Mpv(format!("Shikimori page fetch failed: {}", e)))?;
 
         if res.status().as_u16() == 429 {
             return Err(AppError::Mpv("Shikimori returned 429 — too many requests.".into()));
@@ -478,7 +780,21 @@ impl ContentProvider for ShikimoriServiceImpl {
 
         let (title, original_title, cover_image, genres, years, age_rating, description) = info;
 
-        // Shikimori is metadata-only — no video stream episodes
+        // Fetch similar anime from BestSimilar
+        let mut episodes = Vec::new();
+        let query_title = original_title.as_ref().unwrap_or(&title);
+        if !query_title.is_empty() {
+            println!("[Shikimori] Fetching similar anime from BestSimilar for: {}", query_title);
+            if let Ok(search_results) = self.bestsimilar.search(query_title, proxy_url).await {
+                if let Some(first_res) = search_results.first() {
+                    println!("[Shikimori] Found BestSimilar match: {}", first_res.id);
+                    if let Ok(bs_info) = self.bestsimilar.get_anime_info(&first_res.id, proxy_url).await {
+                        episodes = bs_info.episodes;
+                    }
+                }
+            }
+        }
+
         Ok(ProviderAnimeInfo {
             title,
             original_title,
@@ -487,7 +803,7 @@ impl ContentProvider for ShikimoriServiceImpl {
             genres,
             years,
             age_rating,
-            episodes: Vec::new(), // Shikimori doesn't provide stream URLs
+            episodes,
         })
     }
 

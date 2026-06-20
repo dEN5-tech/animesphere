@@ -1,7 +1,17 @@
 use std::thread;
-use libmpv2::Mpv;
 use shaku::Component;
 use tokio::sync::mpsc;
+use mpv_client::{Client, Event, LogLevel, UninitializedClient}; // Импорты из mpv-client-cross
+
+unsafe fn get_handle_and_set_properties<F>(uninit: UninitializedClient, f: F) -> UninitializedClient
+where
+    F: FnOnce(&mpv_client::Handle),
+{
+    let raw: *mut mpv_client::mpv_handle = std::mem::transmute(uninit);
+    let handle: &mpv_client::Handle = &*(std::ptr::slice_from_raw_parts(raw, 1) as *const mpv_client::Handle);
+    f(handle);
+    std::mem::transmute(raw)
+}
 
 use crate::error::AppError;
 use super::{MpvCommand, MpvService, PlaybackEvent, PlaybackState, NerdStats};
@@ -33,54 +43,60 @@ impl MpvPlayerServiceImpl {
         let state_tx_clone = state_tx.clone();
 
         thread::spawn(move || {
-            // Wait for the AttachWindow command to get the native window handle (wid)
-            let mpv = match cmd_rx.blocking_recv() {
+            // Ожидаем команду AttachWindow для получения дескриптора окна (wid)
+            let (mp, mut token) = match cmd_rx.blocking_recv() {
                 Some(MpvCommand::AttachWindow(wid)) => {
-                    let mpv_builder = Mpv::with_initializer(move |init| {
-                        init.set_option("idle", "yes")?;
-                        init.set_option("vo", "gpu")?;
-                        init.set_option("hwdec", "auto")?;
-                        init.set_option("profile", "gpu-hq")?;
-                        init.set_option("wid", wid)?; // Pass raw window handle to the initializer
-                        Ok(())
-                    });
-
-                    match mpv_builder {
-                        Ok(instance) => {
-                            let min_level = std::ffi::CString::new("info").unwrap();
-                            let _ = unsafe {
-                                libmpv2_sys::mpv_request_log_messages(instance.ctx.as_ptr(), min_level.as_ptr())
+                    match Client::create() {
+                        Ok((uninit, token)) => {
+                            // Настройка параметров до инициализации контекста
+                            let uninit = unsafe {
+                                get_handle_and_set_properties(uninit, |handle| {
+                                    let _ = handle.set_property("idle", "yes".to_string());
+                                    let _ = handle.set_property("vo", "gpu".to_string());
+                                    let _ = handle.set_property("hwdec", "auto".to_string());
+                                    let _ = handle.set_property("profile", "gpu-hq".to_string());
+                                    let _ = handle.set_property("wid", wid); // Передаем HWND/Wid
+                                })
                             };
-                            instance
-                        },
-                        Err(_) => return, // Fail silently inside the isolated thread
+
+                            match uninit.initialize() {
+                                Ok(instance) => {
+                                    // Безопасный запрос логов через API библиотеки
+                                    let _ = instance.request_log_messages(LogLevel::Info);
+                                    (instance, token)
+                                }
+                                Err(_) => return, // Тихо выходим при ошибке инициализации
+                            }
+                        }
+                        Err(_) => return,
                     }
                 }
-                _ => return, // Terminate if receiver is closed or invalid initial command
+                _ => return, // Завершаем поток, если канал закрыт
             };
 
-            // Process actor channel controls once initialized
+            // Основной цикл управления
             loop {
-                // Process events (including logs)
-                while let Some(event) = mpv.wait_event(0.0) {
-                    match event {
-                        Ok(libmpv2::events::Event::LogMessage { prefix, level, text, .. }) => {
-                            println!("[MPV LOG] [{}] {}: {}", level, prefix, text.trim());
+                // 1. Чтение логов и событий (неблокирующее, timeout = 0.0)
+                loop {
+                    match mp.wait_event(&mut token, 0.0) {
+                        Event::LogMessage(log) => {
+                            println!("[MPV LOG] [{}] {}: {}", log.level(), log.prefix(), log.text().trim());
                         }
+                        Event::None => break, // Очередь событий пуста
                         _ => {}
                     }
                 }
 
-                // Process all pending commands
+                // 2. Обработка входящих команд из канала
                 while let Ok(cmd) = cmd_rx.try_recv() {
                     match cmd {
                         MpvCommand::AttachWindow(new_wid) => {
-                            let _ = mpv.set_property("wid", new_wid);
+                            let _ = mp.set_property("wid", new_wid);
                         }
                         MpvCommand::LoadVideo(url) => {
                             let config = crate::services::config::load_config();
                             
-                            // Extract subtitles from URL if present
+                            // Извлечение субтитров из URL
                             let mut play_url = url.clone();
                             let mut subs_to_add = Vec::new();
                             if let Some(pos) = url.find("#subtitles=") {
@@ -98,97 +114,124 @@ impl MpvPlayerServiceImpl {
                             }
 
                             let is_collaps = play_url.contains("collaps") || play_url.contains("interkh.com") || play_url.contains("luxembd.ws");
+                            let is_kodik = play_url.contains("kodik") || play_url.contains("evasion") || play_url.contains("egocdn") || play_url.contains("lightning") || play_url.contains("kodikres") || play_url.contains("secvideo");
+                            let is_aniboom = play_url.contains("aniboom");
+                            let is_sibnet = play_url.contains("sibnet");
+                            let is_jutsu = play_url.contains("jut.su");
                             
-                            // Video playback CDNs (Russian providers and aggregators) should bypass proxy
                             let bypass_proxy = is_collaps
+                                || is_kodik
+                                || is_aniboom
+                                || is_sibnet
+                                || is_jutsu
                                 || play_url.contains("libria.fun")
                                 || play_url.contains("anilibria")
                                 || play_url.contains("aniliberty")
                                 || play_url.contains("animetop")
-                                || play_url.contains("animevost")
-                                || play_url.contains("jut.su")
-                                || play_url.contains("aniboom")
-                                || play_url.contains("sibnet")
-                                || play_url.contains("secvideo");
+                                || play_url.contains("animevost");
 
                             if bypass_proxy {
                                 println!("[MPV] Bypassing proxy for stream URL: {}", play_url);
-                                let _ = mpv.set_property("http-proxy", "");
+                                let _ = mp.set_property("http-proxy", "".to_string());
                             } else {
                                 if !config.proxy_url.trim().is_empty() {
-                                    let _ = mpv.set_property("http-proxy", config.proxy_url.as_str());
+                                    let _ = mp.set_property("http-proxy", config.proxy_url.clone());
                                 } else {
-                                    let _ = mpv.set_property("http-proxy", "");
+                                    let _ = mp.set_property("http-proxy", "".to_string());
                                 }
                             }
 
                             if is_collaps {
                                 println!("[MPV] Setting browser headers for Collaps stream.");
-                                let _ = mpv.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                                let _ = mpv.set_property("http-header-fields", "Origin: https://kinokrad.my,Referer: https://kinokrad.my/");
+                                let _ = mp.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36".to_string());
+                                let _ = mp.set_property("http-header-fields", "Origin: https://kinokrad.my,Referer: https://kinokrad.my/,sec-fetch-dest: empty,sec-fetch-mode: cors,sec-fetch-site: cross-site,accept: */*".to_string());
+                            } else if is_kodik {
+                                println!("[MPV] Setting browser headers for Kodik stream.");
+                                let _ = mp.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string());
+                                let _ = mp.set_property("http-header-fields", "Origin: https://anilib.me,Referer: https://anilib.me/,sec-fetch-dest: empty,sec-fetch-mode: cors,sec-fetch-site: cross-site,accept: */*".to_string());
+                            } else if is_aniboom {
+                                println!("[MPV] Setting browser headers for Aniboom stream.");
+                                let _ = mp.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string());
+                                let _ = mp.set_property("http-header-fields", "Referer: https://aniboom.com/,sec-fetch-dest: empty,sec-fetch-mode: cors,sec-fetch-site: cross-site,accept: */*".to_string());
+                            } else if is_sibnet {
+                                println!("[MPV] Setting browser headers for Sibnet stream.");
+                                let _ = mp.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36".to_string());
+                                let _ = mp.set_property("http-header-fields", "Referer: https://video.sibnet.ru/".to_string());
+                            } else if is_jutsu {
+                                println!("[MPV] Setting browser headers for Jut.su stream.");
+                                let _ = mp.set_property("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0".to_string());
+                                let _ = mp.set_property("http-header-fields", "Referer: https://jut.su/".to_string());
                             } else {
-                                let _ = mpv.set_property("user-agent", "");
-                                let _ = mpv.set_property("http-header-fields", "");
+                                let _ = mp.set_property("user-agent", "".to_string());
+                                let _ = mp.set_property("http-header-fields", "".to_string());
                             }
-                            let _ = mpv.command("loadfile", &[&play_url]);
 
-                            // Load external subtitles
+                            // Вызов команды loadfile
+                            let _ = mp.command(["loadfile", &play_url]);
+
+                            // Загрузка внешних субтитров
                             for (name, sub_url) in subs_to_add {
                                 println!("[MPV] Adding external subtitle track '{}': {}", name, sub_url);
-                                let _ = mpv.command("sub-add", &[&sub_url, "auto", &name]);
+                                let _ = mp.command(["sub-add", &sub_url, "auto", &name]);
                             }
                         }
                         MpvCommand::Play => {
-                            let _ = mpv.set_property("pause", false);
+                            let _ = mp.set_property("pause", false);
                         }
                         MpvCommand::Pause => {
-                            let _ = mpv.set_property("pause", true);
+                            let _ = mp.set_property("pause", true);
                         }
                         MpvCommand::Stop => {
-                            let _ = mpv.command("stop", &[]);
+                            let _ = mp.command(["stop"]);
                         }
                         MpvCommand::Seek(pos) => {
-                            let _ = mpv.set_property("time-pos", pos);
+                            let _ = mp.set_property("time-pos", pos);
                         }
                         MpvCommand::SetVolume(vol) => {
-                            let _ = mpv.set_property("volume", vol);
+                            let _ = mp.set_property("volume", vol);
                         }
                         MpvCommand::SetAnime4K(mode) => {
                             let chain = build_shader_chain(&mode, "./shaders");
                             if chain.is_empty() {
-                                let _ = mpv.command("change-list", &["glsl-shaders", "clr", ""]);
+                                let _ = mp.command(["change-list", "glsl-shaders", "clr", ""]);
                             } else {
-                                let _ = mpv.command("change-list", &["glsl-shaders", "set", &chain]);
+                                let _ = mp.command(["change-list", "glsl-shaders", "set", &chain]);
                             }
                         }
                         MpvCommand::ClearShaders => {
-                            let _ = mpv.command("change-list", &["glsl-shaders", "clr", ""]);
+                            let _ = mp.command(["change-list", "glsl-shaders", "clr", ""]);
                         }
                         MpvCommand::CycleAudio => {
-                            let _ = mpv.command("cycle", &["aid"]);
+                            let _ = mp.command(["cycle", "aid"]);
                         }
                         MpvCommand::CycleSubtitles => {
-                            let _ = mpv.command("cycle", &["sid"]);
+                            let _ = mp.command(["cycle", "sid"]);
+                        }
+                        MpvCommand::SetQuality(idx) => {
+                            let _ = mp.set_property("edition", idx as i64);
                         }
                     }
                 }
 
-                // Query and send state
-                let time_pos = mpv.get_property::<f64>("time-pos").unwrap_or(0.0);
-                let duration = mpv.get_property::<f64>("duration").unwrap_or(0.0);
-                let paused = mpv.get_property::<bool>("pause").unwrap_or(true);
-                let volume = mpv.get_property::<f64>("volume").unwrap_or(0.0);
-                let demuxer_cache_duration = mpv.get_property::<f64>("demuxer-cache-duration").unwrap_or(0.0);
+                // 3. Сбор метрик и состояния воспроизведения
+                let time_pos = mp.get_property::<f64>("time-pos").unwrap_or(0.0);
+                let duration = mp.get_property::<f64>("duration").unwrap_or(0.0);
+                let paused = mp.get_property::<bool>("pause").unwrap_or(true);
+                let volume = mp.get_property::<f64>("volume").unwrap_or(0.0);
+                let demuxer_cache_duration = mp.get_property::<f64>("demuxer-cache-duration").unwrap_or(0.0);
 
-                // Technical stats for nerds
-                let video_codec = mpv.get_property::<String>("video-codec").unwrap_or_else(|_| "unknown".to_string());
-                let audio_codec = mpv.get_property::<String>("audio-codec").unwrap_or_else(|_| "unknown".to_string());
-                let width = mpv.get_property::<i64>("width").unwrap_or(0);
-                let height = mpv.get_property::<i64>("height").unwrap_or(0);
-                let fps = mpv.get_property::<f64>("estimated-vf-fps").unwrap_or(0.0);
-                let hwdec = mpv.get_property::<String>("hwdec-current").unwrap_or_else(|_| "no".to_string());
-                let video_bitrate = mpv.get_property::<f64>("video-bitrate").unwrap_or(0.0);
-                let frame_drop_count = mpv.get_property::<i64>("decoder-frame-drop-count").unwrap_or(0);
+                let current_edition = mp.get_property::<i64>("edition").unwrap_or(0);
+                let editions_count = mp.get_property::<i64>("editions").unwrap_or(0);
+                let edition_list = mp.get_property::<String>("edition-list").unwrap_or_default();
+
+                let video_codec = mp.get_property::<String>("video-codec").unwrap_or_else(|_| "unknown".to_string());
+                let audio_codec = mp.get_property::<String>("audio-codec").unwrap_or_else(|_| "unknown".to_string());
+                let width = mp.get_property::<i64>("width").unwrap_or(0);
+                let height = mp.get_property::<i64>("height").unwrap_or(0);
+                let fps = mp.get_property::<f64>("estimated-vf-fps").unwrap_or(0.0);
+                let hwdec = mp.get_property::<String>("hwdec-current").unwrap_or_else(|_| "no".to_string());
+                let video_bitrate = mp.get_property::<f64>("video-bitrate").unwrap_or(0.0);
+                let frame_drop_count = mp.get_property::<i64>("decoder-frame-drop-count").unwrap_or(0);
 
                 let state = PlaybackState {
                     time_pos,
@@ -196,6 +239,9 @@ impl MpvPlayerServiceImpl {
                     paused,
                     volume,
                     demuxer_cache_duration,
+                    current_edition,
+                    editions_count,
+                    edition_list,
                     nerd_stats: Some(NerdStats {
                         video_codec,
                         audio_codec,
@@ -235,26 +281,22 @@ fn build_shader_chain(mode: &super::Anime4KMode, base_path: &str) -> String {
         super::Anime4KMode::Off => return String::new(),
     };
 
-    // Windows uses semicolon as separator in glsl-shaders list
     let sep = ";";
     let p = base_path;
 
     let clamp        = format!("{}/Anime4K_Clamp_Highlights.glsl", p);
     let restore      = format!("{}/Anime4K_Restore_CNN_{}.glsl", p, q);
-    let restore_soft = format!("{}/Anime4K_Restore_Soft_CNN_{}.glsl", p, q);
+    let restore_soft = format!("{}/Anime4K_Restore_CNN_Soft_{}.glsl", p, q);
     let upscale_dn   = format!("{}/Anime4K_Upscale_Denoise_CNN_x2_{}.glsl", p, q);
     let upscale      = format!("{}/Anime4K_Upscale_CNN_x2_{}.glsl", p, q);
     let down2        = format!("{}/Anime4K_AutoDownscalePre_x2.glsl", p);
     let down4        = format!("{}/Anime4K_AutoDownscalePre_x4.glsl", p);
 
     match mode {
-        // Mode A: Restore → Upscale (лучше для чистых BD-рипов)
         super::Anime4KMode::ModeA(_) =>
             [clamp.as_str(), restore.as_str(), upscale.as_str(), down2.as_str(), down4.as_str(), upscale.as_str()].join(sep),
-        // Mode B: Restore_Soft → Upscale (для aliasing / размытых контуров)
         super::Anime4KMode::ModeB(_) =>
             [clamp.as_str(), restore_soft.as_str(), upscale.as_str(), down2.as_str(), down4.as_str(), upscale.as_str()].join(sep),
-        // Mode C: Upscale+Denoise only (для уже качественного видео)
         super::Anime4KMode::ModeC(_) =>
             [clamp.as_str(), upscale_dn.as_str(), down2.as_str(), down4.as_str(), upscale.as_str()].join(sep),
         super::Anime4KMode::Off => String::new(),

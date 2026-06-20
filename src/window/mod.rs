@@ -1,6 +1,7 @@
 mod app;
 
-mod ipc;
+pub mod ipc;
+pub mod logs;
 mod protocol;
 mod types;
 
