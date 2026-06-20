@@ -7,7 +7,7 @@ fn main() {
     let out_path = PathBuf::from(env::var("OUT_DIR").expect("OUT_DIR not set"));
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS not set");
 
-    if target_os == "windows" {
+    if target_os == "windows" || target_os == "linux" || target_os == "macos" {
         println!("cargo:rustc-link-lib=mpv");
     }
 
