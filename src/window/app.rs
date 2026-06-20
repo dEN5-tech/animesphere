@@ -416,9 +416,23 @@ impl DesktopApp {
         #[cfg(not(target_os = "android"))]
         let webview_builder = webview_builder.with_html(html_layout);
 
-        webview_builder
-            .build(window)
-            .map_err(|e| AppError::WebviewCreation(e.to_string()))
+        #[cfg(target_os = "linux")]
+        {
+            use tao::platform::unix::WindowExtUnix;
+            use wry::WebViewBuilderExtUnix;
+            let vbox = window.default_vbox().map_err(|e| {
+                AppError::WebviewCreation(format!("Failed to get default vertical box from window: {e}"))
+            })?;
+            webview_builder
+                .build_gtk(vbox)
+                .map_err(|e| AppError::WebviewCreation(e.to_string()))
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            webview_builder
+                .build(window)
+                .map_err(|e| AppError::WebviewCreation(e.to_string()))
+        }
     }
 
     #[cfg(not(target_os = "android"))]
